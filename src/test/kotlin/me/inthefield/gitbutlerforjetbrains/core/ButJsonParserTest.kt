@@ -1,4 +1,4 @@
-package com.enapi.gitbutler.core
+package me.inthefield.gitbutlerforjetbrains.core
 
 import com.google.gson.JsonSyntaxException
 import org.junit.Assert.assertEquals

@@ -1,6 +1,6 @@
-package com.enapi.gitbutler.commit
+package me.inthefield.gitbutlerforjetbrains.commit
 
-import com.enapi.gitbutler.core.GitButlerService
+import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
