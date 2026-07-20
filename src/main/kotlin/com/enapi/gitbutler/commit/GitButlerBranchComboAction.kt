@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.KeepPopupOnPerform
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.actionSystem.ex.ComboBoxAction
 import javax.swing.JComponent
@@ -76,6 +77,9 @@ class GitButlerBranchComboAction : ComboBoxAction() {
         init {
             // Mnemonic-free: branch names may contain '_'/'&'.
             templatePresentation.setText(text, false)
+            // ToggleActions default to keeping the popup open (checkbox semantics);
+            // this is a single-choice selector, so close it once a branch is picked.
+            templatePresentation.setKeepPopupOnPerform(KeepPopupOnPerform.Never)
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
