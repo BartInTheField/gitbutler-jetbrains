@@ -2,7 +2,7 @@
 
 <img src="src/main/resources/META-INF/pluginIcon.svg" width="96" height="96" alt="GitButler mark" />
 
-# GitButler for JetBrains
+# GitButler for IDE
 
 ### Commit to GitButler virtual branches without leaving your JetBrains IDE.
 
