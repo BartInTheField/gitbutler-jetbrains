@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>me.inthefield.gitbutlerforjetbrains</id>
-    <name>GitButler - Version control</name>
+    <name>GitButler for JetBrains</name>
     <vendor email="bart.in.t.veld@pm.me">BartInTheField</vendor>
 
     <description><![CDATA[
