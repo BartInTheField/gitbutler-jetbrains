@@ -1,0 +1,71 @@
+steps:
+  # CalVer with a per-day counter: YYYY.M.D.N where N is 1 for the first release
+  # of the day and increments for each further release the same day. The counter
+  # is derived from existing releases, so it resets naturally each new day.
+  version:
+    image: alpine:3.20
+    environment:
+      TOKEN:
+        from_secret: codeberg_token
+    commands:
+      - apk add --no-cache curl jq
+      - Y=$(date -u +%Y)
+      - M=$(date -u +%m | sed 's/^0//')
+      - D=$(date -u +%d | sed 's/^0//')
+      - DATE="$Y.$M.$D"
+      - |
+        MAX=$(curl -sSf -H "Authorization: token $TOKEN" \
+          "https://codeberg.org/api/v1/repos/$CI_REPO/releases?limit=50" \
+          | jq -r '.[].tag_name' \
+          | grep "^${DATE}\." | sed "s/^${DATE}\.//" | sort -n | tail -1 || true)
+      - MAX=${MAX:-0}
+      - VERSION="$DATE.$((MAX + 1))"
+      - echo "$VERSION" > version.txt
+      - 'echo "Version for this build: $VERSION"'
+    when:
+      - event: push
+        branch: main
+
+  build:
+    image: eclipse-temurin:21-jdk
+    commands:
+      - ./gradlew buildPlugin --no-daemon -PpluginVersion="$(cat version.txt)"
+    when:
+      - event: push
+        branch: main
+
+  release:
+    image: alpine:3.20
+    environment:
+      TOKEN:
+        from_secret: codeberg_token
+    commands:
+      - apk add --no-cache curl jq
+      - set -e
+      - VERSION=$(cat version.txt)
+      - ZIP=$(ls build/distributions/*.zip | head -1)
+      - echo "Releasing $ZIP as $VERSION"
+      # Create the release (Forgejo creates the tag at this commit if missing).
+      - |
+        BODY=$(jq -n \
+          --arg tag "$VERSION" \
+          --arg tgt "$CI_COMMIT_SHA" \
+          --arg name "$VERSION" \
+          --arg body "Automated CalVer build of commit $CI_COMMIT_SHA" \
+          '{tag_name:$tag, target_commitish:$tgt, name:$name, body:$body, draft:false, prerelease:false}')
+      - |
+        RELEASE_ID=$(curl -sSf -X POST \
+          -H "Authorization: token $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$BODY" \
+          "https://codeberg.org/api/v1/repos/$CI_REPO/releases" | jq -r '.id')
+      - echo "Created release $RELEASE_ID"
+      # Attach the plugin zip as a release asset.
+      - |
+        curl -sSf -X POST \
+          -H "Authorization: token $TOKEN" \
+          -F "attachment=@$ZIP" \
+          "https://codeberg.org/api/v1/repos/$CI_REPO/releases/$RELEASE_ID/assets?name=$(basename $ZIP)"
+    when:
+      - event: push
+        branch: main
