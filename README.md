@@ -56,6 +56,10 @@ If no virtual branch is selected, the handler steps aside and IntelliJ's normal 
 
 Kotlin, IntelliJ Platform Gradle Plugin 2.x, JDK 21.
 
+## Continuous integration
+
+Every push to `main` runs [Woodpecker CI](https://ci.codeberg.org) (`.woodpecker.yml`): it builds the plugin and publishes a Codeberg release versioned with CalVer (`YYYY.M.D.<build>`), with the plugin `.zip` attached as an asset. The same CalVer version is stamped into the built plugin.
+
 ## Known limitations
 
 - Single git repository per project

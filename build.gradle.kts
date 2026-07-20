@@ -4,7 +4,8 @@ plugins {
 }
 
 group = "com.enapi.gitbutler"
-version = "0.1.0"
+// CalVer (YYYY.M.D.BUILD) is injected by CI via -PpluginVersion; local builds use the fallback.
+version = (findProperty("pluginVersion") as String?) ?: "0.1.0-dev"
 
 repositories {
     mavenCentral()
