@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>me.inthefield.gitbutlerforjetbrains</id>
-    <name>GitButler for JetBrains</name>
+    <name>GitButler for IDE</name>
     <vendor email="bart.in.t.veld@pm.me">BartInTheField</vendor>
 
     <description><![CDATA[
@@ -16,6 +16,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <checkinHandlerFactory implementation="me.inthefield.gitbutlerforjetbrains.commit.GitButlerCheckinHandlerFactory"/>
         <notificationGroup id="GitButler" displayType="BALLOON"/>
+        <toolWindow id="GitButler" anchor="left" secondary="true" icon="/icons/gitbutlerToolWindow.svg" factoryClass="me.inthefield.gitbutlerforjetbrains.toolwindow.GitButlerToolWindowFactory"/>
     </extensions>
 
     <actions>
