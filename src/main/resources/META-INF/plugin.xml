@@ -1,0 +1,26 @@
+<idea-plugin>
+    <id>com.enapi.gitbutler</id>
+    <name>GitButler</name>
+    <vendor email="bart.in.t.veld@pm.me">BartInTheField</vendor>
+
+    <description><![CDATA[
+        Adds GitButler virtual-branch support to the IntelliJ commit window, letting you assign changes to virtual branches without leaving the IDE.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <checkinHandlerFactory implementation="com.enapi.gitbutler.commit.GitButlerCheckinHandlerFactory"/>
+        <notificationGroup id="GitButler" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <action id="GitButler.BranchCombo"
+                class="com.enapi.gitbutler.commit.GitButlerBranchComboAction"
+                text="GitButler Branch"
+                description="Select the GitButler virtual branch to commit to">
+            <add-to-group group-id="ChangesView.CommitToolbar" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>
