@@ -17,8 +17,8 @@ steps:
         MAX=$(curl -sSf -H "Authorization: token $TOKEN" \
           "https://codeberg.org/api/v1/repos/$CI_REPO/releases?limit=50" \
           | jq -r '.[].tag_name' \
-          | grep "^${DATE}\." | sed "s/^${DATE}\.//" | sort -n | tail -1 || true)
-      - MAX=${MAX:-0}
+          | grep "^$${DATE}\." | sed "s/^$${DATE}\.//" | sort -n | tail -1 || true)
+      - MAX=$${MAX:-0}
       - VERSION="$DATE.$((MAX + 1))"
       - echo "$VERSION" > version.txt
       - 'echo "Version for this build: $VERSION"'
