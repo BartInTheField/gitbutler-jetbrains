@@ -1,7 +1,7 @@
-package com.enapi.gitbutler.commit
+package me.inthefield.gitbutlerforjetbrains.commit
 
-import com.enapi.gitbutler.core.ButResult
-import com.enapi.gitbutler.core.GitButlerService
+import me.inthefield.gitbutlerforjetbrains.core.ButResult
+import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.progress.ProgressManager

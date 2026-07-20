@@ -1,4 +1,4 @@
-package com.enapi.gitbutler.core
+package me.inthefield.gitbutlerforjetbrains.core
 
 data class VirtualBranch(val cliId: String, val name: String)
 

@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.6.0"
 }
 
-group = "com.enapi.gitbutler"
+group = "me.inthefield.gitbutlerforjetbrains"
 // CalVer (YYYY.M.D.BUILD) is injected by CI via -PpluginVersion; local builds use the fallback.
 version = (findProperty("pluginVersion") as String?) ?: "0.1.0-dev"
 

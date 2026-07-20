@@ -1,4 +1,4 @@
-package com.enapi.gitbutler.core
+package me.inthefield.gitbutlerforjetbrains.core
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler

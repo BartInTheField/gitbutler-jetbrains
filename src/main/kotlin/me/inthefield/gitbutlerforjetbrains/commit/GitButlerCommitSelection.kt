@@ -1,7 +1,7 @@
-package com.enapi.gitbutler.commit
+package me.inthefield.gitbutlerforjetbrains.commit
 
-import com.enapi.gitbutler.core.ButResult
-import com.enapi.gitbutler.core.GitButlerService
+import me.inthefield.gitbutlerforjetbrains.core.ButResult
+import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -94,7 +94,7 @@ class GitButlerCommitSelection(private val project: Project) {
     }
 
     companion object {
-        const val SELECTED_BRANCH_KEY = "com.enapi.gitbutler.selectedBranch"
+        const val SELECTED_BRANCH_KEY = "me.inthefield.gitbutlerforjetbrains.selectedBranch"
         private const val STALE_MS = 10_000L
 
         fun getInstance(project: Project): GitButlerCommitSelection = project.service()

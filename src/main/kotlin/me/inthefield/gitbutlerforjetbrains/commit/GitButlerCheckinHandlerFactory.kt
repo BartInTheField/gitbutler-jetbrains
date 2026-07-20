@@ -1,4 +1,4 @@
-package com.enapi.gitbutler.commit
+package me.inthefield.gitbutlerforjetbrains.commit
 
 import com.intellij.openapi.vcs.CheckinProjectPanel
 import com.intellij.openapi.vcs.changes.CommitContext

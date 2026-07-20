@@ -1,4 +1,4 @@
-package com.enapi.gitbutler.core
+package me.inthefield.gitbutlerforjetbrains.core
 
 import java.io.File
 import java.io.IOException

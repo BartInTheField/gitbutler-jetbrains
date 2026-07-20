@@ -1,4 +1,4 @@
-package com.enapi.gitbutler.core
+package me.inthefield.gitbutlerforjetbrains.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
