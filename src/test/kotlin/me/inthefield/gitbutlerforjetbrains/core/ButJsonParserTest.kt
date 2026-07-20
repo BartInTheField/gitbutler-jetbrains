@@ -2,6 +2,8 @@ package me.inthefield.gitbutlerforjetbrains.core
 
 import com.google.gson.JsonSyntaxException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -32,8 +34,14 @@ class ButJsonParserTest {
         val status = ButJsonParser.parseStatus(fullStatusJson)
 
         assertEquals(2, status.branches.size)
-        assertEquals(VirtualBranch("on", "feature-one"), status.branches[0])
-        assertEquals(VirtualBranch("tw", "feature-two"), status.branches[1])
+        assertEquals(
+            VirtualBranch("on", "feature-one", emptyList(), "completelyUnpushed"),
+            status.branches[0],
+        )
+        assertEquals(
+            VirtualBranch("tw", "feature-two", emptyList(), "completelyUnpushed"),
+            status.branches[1],
+        )
 
         assertEquals(2, status.uncommittedChanges.size)
         assertEquals(UncommittedChange("zm", "one.txt", "added"), status.uncommittedChanges[0])
@@ -64,6 +72,125 @@ class ButJsonParserTest {
             "expected assigned.txt in uncommittedChanges",
             status.uncommittedChanges.any { it.cliId == "aa" && it.filePath == "assigned.txt" },
         )
+
+        // The stack also exposes its assignedChanges directly...
+        val stack = status.stacks[0]
+        assertEquals(1, stack.assignedChanges.size)
+        assertEquals(UncommittedChange("aa", "assigned.txt", "modified"), stack.assignedChanges[0])
+
+        // ...and they are the SAME instances that were merged into the flat list.
+        val flat = status.uncommittedChanges.first { it.cliId == "aa" }
+        assertSame(flat, stack.assignedChanges[0])
+    }
+
+    @Test
+    fun parseStatus_stackWithCommits_populatesStacksBranchesAndCommits() {
+        val json = """
+            {
+              "uncommittedChanges": [],
+              "stacks": [
+                {
+                  "cliId": "g0",
+                  "assignedChanges": [],
+                  "branches": [
+                    {
+                      "cliId": "ch",
+                      "name": "chore/branding",
+                      "commits": [
+                        {
+                          "cliId": "8b",
+                          "commitId": "8b114f9b9bf2cc122508e39e7b9c16f814419908",
+                          "createdAt": "2026-07-20T18:57:28+00:00",
+                          "message": "chore: rename display name to 'GitButler for JetBrains'\n\nsecond line body",
+                          "authorName": "BartInTheField",
+                          "authorEmail": "bart.in.t.veld@pm.me",
+                          "conflicted": false,
+                          "reviewId": null,
+                          "changes": null
+                        }
+                      ],
+                      "upstreamCommits": [],
+                      "branchStatus": "nothingToPush",
+                      "reviewId": null,
+                      "ci": null
+                    }
+                  ]
+                }
+              ],
+              "mergeBase": {"cliId": "", "commitId": "a58a"},
+              "upstreamState": {"behind": 0}
+            }
+        """.trimIndent()
+
+        val status = ButJsonParser.parseStatus(json)
+
+        assertEquals(1, status.stacks.size)
+        val stack = status.stacks[0]
+        assertEquals("g0", stack.cliId)
+        assertEquals(1, stack.branches.size)
+
+        val branch = stack.branches[0]
+        assertEquals("ch", branch.cliId)
+        assertEquals("chore/branding", branch.name)
+        assertEquals("nothingToPush", branch.branchStatus)
+
+        // flat branches list holds the same branch instance as the stack
+        assertEquals(1, status.branches.size)
+        assertSame(stack.branches[0], status.branches[0])
+
+        assertEquals(1, branch.commits.size)
+        val commit = branch.commits[0]
+        assertEquals("8b", commit.cliId)
+        assertEquals("8b114f9b9bf2cc122508e39e7b9c16f814419908", commit.commitId)
+        assertEquals("BartInTheField", commit.authorName)
+        assertEquals("2026-07-20T18:57:28+00:00", commit.createdAt)
+        assertFalse(commit.conflicted)
+        // multi-line message kept verbatim
+        assertEquals(
+            "chore: rename display name to 'GitButler for JetBrains'\n\nsecond line body",
+            commit.message,
+        )
+    }
+
+    @Test
+    fun parseStatus_missingCommitsAndBranchStatus_defaultToEmpty() {
+        val json = """
+            {
+              "uncommittedChanges": [],
+              "stacks": [
+                {"cliId": "g0", "assignedChanges": [], "branches": [
+                  {"cliId": "ch", "name": "chore/branding"}
+                ]}
+              ]
+            }
+        """.trimIndent()
+
+        val status = ButJsonParser.parseStatus(json)
+
+        val branch = status.branches[0]
+        assertTrue(branch.commits.isEmpty())
+        assertEquals("", branch.branchStatus)
+    }
+
+    @Test
+    fun parseStatus_conflictedNull_treatedAsFalse() {
+        val json = """
+            {
+              "uncommittedChanges": [],
+              "stacks": [
+                {"cliId": "g0", "assignedChanges": [], "branches": [
+                  {"cliId": "ch", "name": "chore/branding", "branchStatus": "nothingToPush", "commits": [
+                    {"cliId": "8b", "commitId": "8b114f9", "message": "msg", "authorName": "Bart", "createdAt": "2026-07-20T18:57:28+00:00", "conflicted": null}
+                  ]}
+                ]}
+              ]
+            }
+        """.trimIndent()
+
+        val status = ButJsonParser.parseStatus(json)
+
+        val commit = status.branches[0].commits[0]
+        assertFalse(commit.conflicted)
     }
 
     @Test

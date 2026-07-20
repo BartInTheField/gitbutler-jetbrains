@@ -16,8 +16,14 @@ import com.google.gson.JsonParser
 object ButJsonParser {
 
     /**
-     * Parses `but status --format json`. branches = all branches of all stacks, in order.
-     * uncommittedChanges also includes every stack's assignedChanges entries.
+     * Parses `but status --format json`. branches = all branches of all stacks, in order
+     * (the same [VirtualBranch] instances that appear under [WorkspaceStatus.stacks]).
+     * uncommittedChanges also includes every stack's assignedChanges entries; each stack's
+     * assignedChanges are ADDITIONALLY exposed on [ButStack.assignedChanges] (the same
+     * [UncommittedChange] instances appear in both the flat list and on the stack).
+     *
+     * Each branch carries its parsed commits and branchStatus (missing branchStatus -> "").
+     * Fields like changes, reviewId, ci, upstreamCommits, mergeBase and upstreamState are ignored.
      */
     fun parseStatus(json: String): WorkspaceStatus {
         val root = JsonParser.parseString(json).asJsonObject
@@ -28,23 +34,26 @@ object ButJsonParser {
         }
 
         val branches = mutableListOf<VirtualBranch>()
+        val stacks = mutableListOf<ButStack>()
         root.getAsJsonArray("stacks")?.forEach { stackElement ->
             val stack = stackElement.asJsonObject
+            val assigned = mutableListOf<UncommittedChange>()
             stack.getAsJsonArray("assignedChanges")?.forEach { element ->
-                parseChange(element)?.let { uncommitted.add(it) }
+                parseChange(element)?.let {
+                    uncommitted.add(it)
+                    assigned.add(it)
+                }
             }
+            val stackBranches = mutableListOf<VirtualBranch>()
             stack.getAsJsonArray("branches")?.forEach { branchElement ->
                 val branch = branchElement.asJsonObject
-                branches.add(
-                    VirtualBranch(
-                        cliId = stringOrEmpty(branch, "cliId"),
-                        name = stringOrEmpty(branch, "name"),
-                    ),
-                )
+                stackBranches.add(parseBranch(branch))
             }
+            branches.addAll(stackBranches)
+            stacks.add(ButStack(cliId = stringOrEmpty(stack, "cliId"), branches = stackBranches, assignedChanges = assigned))
         }
 
-        return WorkspaceStatus(uncommittedChanges = uncommitted, branches = branches)
+        return WorkspaceStatus(uncommittedChanges = uncommitted, branches = branches, stacks = stacks)
     }
 
     /**
@@ -101,6 +110,32 @@ object ButJsonParser {
         )
     }
 
+    private fun parseBranch(obj: JsonObject): VirtualBranch {
+        val commits = mutableListOf<ButCommit>()
+        obj.getAsJsonArray("commits")?.forEach { element ->
+            if (element.isJsonObject) {
+                commits.add(parseCommit(element.asJsonObject))
+            }
+        }
+        return VirtualBranch(
+            cliId = stringOrEmpty(obj, "cliId"),
+            name = stringOrEmpty(obj, "name"),
+            commits = commits,
+            branchStatus = stringOrEmpty(obj, "branchStatus"),
+        )
+    }
+
+    private fun parseCommit(obj: JsonObject): ButCommit {
+        return ButCommit(
+            cliId = stringOrEmpty(obj, "cliId"),
+            commitId = stringOrEmpty(obj, "commitId"),
+            message = stringOrEmpty(obj, "message"),
+            authorName = stringOrEmpty(obj, "authorName"),
+            createdAt = stringOrEmpty(obj, "createdAt"),
+            conflicted = optBoolean(obj, "conflicted"),
+        )
+    }
+
     private fun renderRejected(element: JsonElement): String {
         if (element.isJsonObject) {
             val obj = element.asJsonObject
@@ -110,6 +145,15 @@ object ButJsonParser {
             return element.asString
         }
         return element.toString()
+    }
+
+    /** Reads a boolean; null / missing / non-boolean -> false. */
+    private fun optBoolean(obj: JsonObject, key: String): Boolean {
+        val element = obj.get(key) ?: return false
+        if (element.isJsonNull) {
+            return false
+        }
+        return element.isJsonPrimitive && element.asJsonPrimitive.isBoolean && element.asBoolean
     }
 
     private fun stringOrEmpty(obj: JsonObject, key: String): String = optString(obj, key) ?: ""

@@ -191,14 +191,13 @@ class GitButlerService(private val project: Project) {
     private fun repositories(): List<GitRepository> =
         GitRepositoryManager.getInstance(project).repositories
 
-    private fun repoRoot(): String? {
+    /** The repository this plugin operates on: prefer the one on gitbutler/workspace, else the first. */
+    fun workspaceRepository(): GitRepository? {
         val repos = repositories()
-        if (repos.isEmpty()) {
-            return null
-        }
-        val onWorkspace = repos.firstOrNull { it.currentBranchName == WORKSPACE_BRANCH }
-        return (onWorkspace ?: repos.first()).root.path
+        return repos.firstOrNull { it.currentBranchName == WORKSPACE_BRANCH } ?: repos.firstOrNull()
     }
+
+    private fun repoRoot(): String? = workspaceRepository()?.root?.path
 
     private fun assertBackgroundThread() {
         ApplicationManager.getApplication().assertIsNonDispatchThread()
