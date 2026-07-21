@@ -4,7 +4,9 @@
     <vendor email="bart.in.t.veld@pm.me">BartInTheField</vendor>
 
     <description><![CDATA[
-        Adds GitButler virtual-branch support to the IntelliJ commit window, letting you assign changes to virtual branches without leaving the IDE.
+        Adds GitButler virtual-branch support to the IDE: commit to virtual branches straight from the IntelliJ commit window,
+        and browse your GitButler workspace in a dedicated tool window — unassigned changes, applied branches and their commits,
+        with diff navigation, pull, push, and unapply built in.
         <br/><br/>
         This is an <b>unofficial</b> plugin and is not affiliated with or endorsed by GitButler.
         The GitButler mark is used under its CC0-1.0 brand assets (github.com/gitbutlerapp/gitbutler-brand-assets).

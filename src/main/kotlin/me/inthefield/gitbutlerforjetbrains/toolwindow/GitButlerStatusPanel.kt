@@ -1,14 +1,21 @@
 package me.inthefield.gitbutlerforjetbrains.toolwindow
 
 import com.intellij.icons.AllIcons
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.ui.PopupHandler
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -50,6 +57,9 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
 
     private val rootNode = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(rootNode)
+
+    /** True while a pull/unapply/push runs; gates the actions so operations never overlap. */
+    private var operationInFlight = false
     private val tree = Tree(treeModel).apply {
         isRootVisible = false
         showsRootHandles = true
@@ -61,6 +71,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         toolbar = buildToolbar()
         setContent(JBScrollPane(tree))
         installActivation()
+        installContextMenu()
     }
 
     /**
@@ -126,11 +137,86 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     private fun repoRoot() = GitButlerService.getInstance(project).workspaceRepository()?.root
 
     private fun buildToolbar(): JComponent {
-        val group = DefaultActionGroup().apply { add(RefreshAction()) }
+        val group = DefaultActionGroup().apply {
+            add(RefreshAction())
+            add(PullWorkspaceAction())
+        }
         val actionToolbar = ActionManager.getInstance()
             .createActionToolbar("GitButlerToolWindow", group, true)
         actionToolbar.targetComponent = tree
         return actionToolbar.component
+    }
+
+    /** Right-click menu on branch rows: unapply or push the selected branch. */
+    private fun installContextMenu() {
+        // Select the row under the cursor before the menu's update() reads the selection —
+        // don't rely on the tree doing this on popup trigger.
+        tree.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) = selectOnPopupTrigger(e)
+            override fun mouseReleased(e: MouseEvent) = selectOnPopupTrigger(e)
+
+            private fun selectOnPopupTrigger(e: MouseEvent) {
+                if (!e.isPopupTrigger) {
+                    return
+                }
+                val path = tree.getPathForLocation(e.x, e.y) ?: return
+                if (!tree.isPathSelected(path)) {
+                    tree.selectionPath = path
+                }
+            }
+        })
+
+        val group = DefaultActionGroup().apply {
+            add(UnapplyBranchAction())
+            add(PushBranchAction())
+        }
+        PopupHandler.installPopupMenu(tree, group, "GitButlerStatusPopup")
+    }
+
+    /** The [VirtualBranch] of the currently-selected [BranchNode], or null if the selection is elsewhere. */
+    private fun selectedBranch(): VirtualBranch? {
+        val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
+        return (node?.userObject as? BranchNode)?.branch
+    }
+
+    /**
+     * Runs a GitButler mutation on a background thread (the service asserts non-EDT, which
+     * [Task.Backgroundable] satisfies), then on the EDT notifies success/failure through the
+     * "GitButler" notification group and refreshes the tree.
+     */
+    private fun runOperation(title: String, successMessage: String, operation: () -> ButResult<Unit>) {
+        if (operationInFlight) {
+            return
+        }
+        operationInFlight = true
+        val task = object : Task.Backgroundable(project, title) {
+            private var result: ButResult<Unit>? = null
+
+            override fun run(indicator: ProgressIndicator) {
+                result = operation()
+            }
+
+            // Always called on the EDT — also after a failure or cancellation, so the
+            // in-flight flag can never get stuck.
+            override fun onFinished() {
+                operationInFlight = false
+                if (project.isDisposed) {
+                    return
+                }
+                val group = NotificationGroupManager.getInstance().getNotificationGroup("GitButler")
+                when (val r = result) {
+                    is ButResult.Ok ->
+                        group.createNotification(successMessage, NotificationType.INFORMATION).notify(project)
+
+                    is ButResult.Err ->
+                        group.createNotification(r.message, NotificationType.ERROR).notify(project)
+
+                    null -> {}
+                }
+                refresh()
+            }
+        }
+        ProgressManager.getInstance().run(task)
     }
 
     /**
@@ -235,6 +321,56 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         AnAction("Refresh", "Re-run GitButler status", AllIcons.Actions.Refresh) {
         override fun actionPerformed(e: AnActionEvent) {
             refresh()
+        }
+    }
+
+    private inner class PullWorkspaceAction :
+        AnAction("Pull Workspace", "Fetch remote and rebase applied branches", AllIcons.Actions.CheckOut) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled =
+                !operationInFlight && GitButlerService.getInstance(project).isGitButlerWorkspace()
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            runOperation("Pulling GitButler workspace", "Workspace updated") {
+                GitButlerService.getInstance(project).pull()
+            }
+        }
+    }
+
+    private inner class UnapplyBranchAction : AnAction() {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            // setText(_, false): branch names carry underscores/ampersands — keep them literal, no mnemonics.
+            e.presentation.setText("Unapply Branch", false)
+            e.presentation.isEnabledAndVisible = selectedBranch() != null && !operationInFlight
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val name = selectedBranch()?.name ?: return
+            runOperation("Unapplying $name", "Unapplied $name") {
+                GitButlerService.getInstance(project).unapply(name)
+            }
+        }
+    }
+
+    private inner class PushBranchAction : AnAction(AllIcons.Vcs.Push) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            // setText(_, false): branch names carry underscores/ampersands — keep them literal, no mnemonics.
+            e.presentation.setText("Push Branch", false)
+            e.presentation.isEnabledAndVisible = selectedBranch() != null && !operationInFlight
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val name = selectedBranch()?.name ?: return
+            runOperation("Pushing $name", "Pushed $name") {
+                GitButlerService.getInstance(project).push(name)
+            }
         }
     }
 

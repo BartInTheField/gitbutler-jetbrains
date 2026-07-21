@@ -101,6 +101,51 @@ class GitButlerService(private val project: Project) {
     }
 
     /**
+     * Runs `but pull --format json`. Fetches the remote and rebases all applied branches onto
+     * the updated target — a network operation, so uses [PUSH_TIMEOUT_MS]. Ok on exit 0. Not on EDT.
+     */
+    fun pull(): ButResult<Unit> {
+        assertBackgroundThread()
+
+        val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
+        val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
+
+        val output = when (
+            val r = runBut(exe, repoRoot, listOf("pull", "--format", "json"), PUSH_TIMEOUT_MS)
+        ) {
+            is ButResult.Ok -> r.value
+            is ButResult.Err -> return r
+        }
+
+        if (output.exitCode != 0) {
+            return ButResult.Err(ButJsonParser.parseErrorMessage(output.stdout.ifBlank { output.stderr }))
+        }
+
+        return ButResult.Ok(Unit)
+    }
+
+    /** Runs `but unapply <branchName> --format json`. Ok on exit 0. Not on EDT. */
+    fun unapply(branchName: String): ButResult<Unit> {
+        assertBackgroundThread()
+
+        val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
+        val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
+
+        val output = when (
+            val r = runBut(exe, repoRoot, listOf("unapply", branchName, "--format", "json"))
+        ) {
+            is ButResult.Ok -> r.value
+            is ButResult.Err -> return r
+        }
+
+        if (output.exitCode != 0) {
+            return ButResult.Err(ButJsonParser.parseErrorMessage(output.stdout.ifBlank { output.stderr }))
+        }
+
+        return ButResult.Ok(Unit)
+    }
+
+    /**
      * Commits the given files to the named virtual branch:
      * 1. run status(); map each path to its cliId via uncommittedChanges
      * 2. Err listing the offending paths if any path has no cliId
