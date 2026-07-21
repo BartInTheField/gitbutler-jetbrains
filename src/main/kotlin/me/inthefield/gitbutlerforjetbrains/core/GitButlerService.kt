@@ -63,7 +63,7 @@ class GitButlerService(private val project: Project) {
         val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
-        val output = when (val r = runBut(exe, repoRoot, listOf("status", "--format", "json"))) {
+        val output = when (val r = runBut(exe, repoRoot, ButCommands.status())) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
         }
@@ -87,7 +87,7 @@ class GitButlerService(private val project: Project) {
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
         val output = when (
-            val r = runBut(exe, repoRoot, listOf("push", branchName, "--format", "json"), PUSH_TIMEOUT_MS)
+            val r = runBut(exe, repoRoot, ButCommands.push(branchName), PUSH_TIMEOUT_MS)
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
@@ -129,20 +129,7 @@ class GitButlerService(private val project: Project) {
         }
 
         val output = when (
-            val r = runBut(
-                exe,
-                repoRoot,
-                listOf(
-                    "commit",
-                    branchName,
-                    "-m",
-                    message,
-                    "--changes",
-                    mapResult.cliIds.joinToString(","),
-                    "--format",
-                    "json",
-                ),
-            )
+            val r = runBut(exe, repoRoot, ButCommands.commit(branchName, message, mapResult.cliIds))
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
@@ -191,14 +178,13 @@ class GitButlerService(private val project: Project) {
     private fun repositories(): List<GitRepository> =
         GitRepositoryManager.getInstance(project).repositories
 
-    private fun repoRoot(): String? {
+    /** The repository this plugin operates on: prefer the one on gitbutler/workspace, else the first. */
+    fun workspaceRepository(): GitRepository? {
         val repos = repositories()
-        if (repos.isEmpty()) {
-            return null
-        }
-        val onWorkspace = repos.firstOrNull { it.currentBranchName == WORKSPACE_BRANCH }
-        return (onWorkspace ?: repos.first()).root.path
+        return repos.firstOrNull { it.currentBranchName == WORKSPACE_BRANCH } ?: repos.firstOrNull()
     }
+
+    private fun repoRoot(): String? = workspaceRepository()?.root?.path
 
     private fun assertBackgroundThread() {
         ApplicationManager.getApplication().assertIsNonDispatchThread()

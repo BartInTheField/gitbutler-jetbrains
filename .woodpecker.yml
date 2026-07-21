@@ -1,4 +1,24 @@
+# Only PRs and pushes to main spawn pipelines — plain branch pushes would
+# otherwise start a vacuous clone-only pipeline that can race the PR pipeline.
+when:
+  - event: pull_request
+  - event: push
+    branch: main
+
 steps:
+  # Unit tests + integration tests + plugin build. Runs on every PR and again on
+  # main before releasing. The GitButler CLI integration tests need a Docker
+  # daemon; on runners without one (Codeberg CI does not offer docker-in-docker)
+  # they self-skip via an Assume and only the unit tests gate the build.
+  test:
+    image: eclipse-temurin:21-jdk
+    commands:
+      - ./gradlew test buildPlugin --no-daemon
+    when:
+      - event: pull_request
+      - event: push
+        branch: main
+
   # CalVer with a per-day counter: YYYY.M.D.N where N is 1 for the first release
   # of the day and increments for each further release the same day. The counter
   # is derived from existing releases, so it resets naturally each new day.

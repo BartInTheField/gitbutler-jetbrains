@@ -1,12 +1,29 @@
 package me.inthefield.gitbutlerforjetbrains.core
 
-data class VirtualBranch(val cliId: String, val name: String)
+data class ButCommit(
+    val cliId: String,
+    val commitId: String,
+    val message: String,
+    val authorName: String,
+    val createdAt: String,
+    val conflicted: Boolean,
+)
+
+data class VirtualBranch(
+    val cliId: String,
+    val name: String,
+    val commits: List<ButCommit> = emptyList(),
+    val branchStatus: String = "",
+)
+
+data class ButStack(val cliId: String, val branches: List<VirtualBranch>, val assignedChanges: List<UncommittedChange> = emptyList())
 
 data class UncommittedChange(val cliId: String, val filePath: String, val changeType: String)
 
 data class WorkspaceStatus(
     val uncommittedChanges: List<UncommittedChange>,
     val branches: List<VirtualBranch>,
+    val stacks: List<ButStack> = emptyList(),
 )
 
 sealed class ButResult<out T> {
