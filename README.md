@@ -4,9 +4,9 @@
 
 # GitButler for IDE
 
-### Commit to GitButler virtual branches without leaving your JetBrains IDE.
+### Work with GitButler virtual branches without leaving your JetBrains IDE.
 
-Assign changes to a virtual branch straight from the IntelliJ commit window — no context-switch to the GitButler app or terminal.
+Commit to a virtual branch straight from the IntelliJ commit window, and see your whole GitButler workspace — unassigned changes, stacks, branches, commits — in a dedicated tool window. No context-switch to the GitButler app or terminal.
 
 <br/>
 
@@ -25,7 +25,10 @@ Assign changes to a virtual branch straight from the IntelliJ commit window — 
 
 ## What it does
 
-When your project is on the `gitbutler/workspace` branch, the Commit tool window's message-area toolbar (right next to the **Amend** toggle) gains an always-visible **GitButler branch** selector. Pick a virtual branch, check your files, and the commit is routed through the GitButler CLI (`but commit`) instead of plain git.
+The plugin adds two GitButler surfaces to the IDE, both active only when your project is on `gitbutler/workspace`:
+
+1. **Virtual-branch commit** — the Commit tool window's message-area toolbar (right next to the **Amend** toggle) gains an always-visible **GitButler branch** selector. Pick a virtual branch, check your files, and the commit is routed through the GitButler CLI (`but commit`) instead of plain git.
+2. **GitButler tool window** — a dedicated tool window on the bottom-left stripe (alongside the Git window) mirrors `but status` as a tree: unassigned changes, per-stack assigned changes, applied branches with push status, and their commits. Double-click a file to open its diff (untracked files open in the editor); double-click a commit to jump to it in the Git Log.
 
 <div align="center">
 
@@ -39,6 +42,9 @@ When your project is on the `gitbutler/workspace` branch, the Commit tool window
 - 🎯 **Inline branch selector** — always-visible virtual-branch combo in the commit toolbar, beside the Amend toggle
 - ✅ **Commits exactly what you check** — selected files are mapped to GitButler change IDs via `but status`
 - 🚀 **Commit and Push…** — also pushes the virtual branch (`but push`)
+- 🌳 **GitButler tool window** — live `but status` tree with VCS-colored file rows, diff-on-double-click, and jump-to-commit in the Git Log
+- 🧰 **Workspace actions in-IDE** — Pull Workspace (`but pull`) from the toolbar; Unapply Branch and Push Branch from the branch context menu
+- 🔄 **Auto-refreshing** — the tool window re-renders on git repository changes (500 ms debounced) and via a manual Refresh button
 - 🔔 **Clear notifications** — committed / committed & pushed / push failed / commit failed; a failed commit never loses your message
 - 💾 **Remembers your last-used branch** per project
 
@@ -63,22 +69,35 @@ Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…*
 
 ## 🚀 Usage
 
+### Commit to a virtual branch
+
 1. Open a GitButler-managed project (branch `gitbutler/workspace`).
 2. Open the Commit tool window — the **GitButler branch** selector sits in the message-area toolbar next to the Amend toggle.
 3. Choose a virtual branch — or `Git: no virtual branch` for a normal git commit.
 4. Select files, write a message, hit **Commit** (or **Commit and Push…**).
 
+### GitButler tool window
+
+Open the **GitButler** tool window from the bottom-left stripe (same corner as the Git window). It shows unassigned changes, each stack's assigned changes, and every applied branch with its commits — refreshed automatically on repository changes. Use the toolbar's **Pull Workspace** button to run `but pull`, and right-click a branch for **Unapply Branch** or **Push Branch**.
+
 ## ⚙️ How it works
 
-The plugin registers a `CheckinHandler` that intercepts the commit flow. All GitButler operations go through the `but` CLI with `--format json`:
+The plugin registers a `CheckinHandler` that intercepts the commit flow and a tool window that renders `but status`. All GitButler operations go through the `but` CLI with `--format json`:
 
 | Step | Command |
 |---|---|
-| List branches, map files → change IDs | `but status` |
+| List branches, map files → change IDs; render the tool window | `but status` |
 | Commit exactly the selected changes | `but commit <branch> -m <message> --changes <ids>` |
-| Push (via *Commit and Push*) | `but push <branch>` |
+| Push (via *Commit and Push*, or tool-window context menu) | `but push <branch>` |
+| Pull Workspace toolbar button | `but pull` |
+| Unapply Branch context menu | `but unapply <branch>` |
 
-If no virtual branch is selected, the handler steps aside and IntelliJ's normal git commit runs untouched.
+If no virtual branch is selected in the commit toolbar, the handler steps aside and IntelliJ's normal git commit runs untouched.
+
+## 📚 Documentation
+
+- [Virtual-branch commit](docs/virtual-branch-commit.md) — the commit-window integration
+- [GitButler tool window](docs/tool-window.md) — the workspace tree, toolbar and branch context menu
 
 ## 👩‍💻 Development
 
