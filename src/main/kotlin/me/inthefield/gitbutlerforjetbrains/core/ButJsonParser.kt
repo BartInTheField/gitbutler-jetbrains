@@ -72,7 +72,8 @@ object ButJsonParser {
             return ButResult.Err(parseErrorMessage(json))
         }
 
-        val result = root.getAsJsonObject("result") ?: return ButResult.Ok("")
+        // but 0.21 emits commit_id/rejected either nested under "result" or at the top level.
+        val result = root.getAsJsonObject("result") ?: root
 
         val rejected = result.getAsJsonArray("rejected")
         if (rejected != null && rejected.size() > 0) {

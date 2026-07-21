@@ -63,7 +63,7 @@ class GitButlerService(private val project: Project) {
         val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
-        val output = when (val r = runBut(exe, repoRoot, listOf("status", "--format", "json"))) {
+        val output = when (val r = runBut(exe, repoRoot, ButCommands.status())) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
         }
@@ -87,7 +87,7 @@ class GitButlerService(private val project: Project) {
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
         val output = when (
-            val r = runBut(exe, repoRoot, listOf("push", branchName, "--format", "json"), PUSH_TIMEOUT_MS)
+            val r = runBut(exe, repoRoot, ButCommands.push(branchName), PUSH_TIMEOUT_MS)
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
@@ -129,20 +129,7 @@ class GitButlerService(private val project: Project) {
         }
 
         val output = when (
-            val r = runBut(
-                exe,
-                repoRoot,
-                listOf(
-                    "commit",
-                    branchName,
-                    "-m",
-                    message,
-                    "--changes",
-                    mapResult.cliIds.joinToString(","),
-                    "--format",
-                    "json",
-                ),
-            )
+            val r = runBut(exe, repoRoot, ButCommands.commit(branchName, message, mapResult.cliIds))
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
