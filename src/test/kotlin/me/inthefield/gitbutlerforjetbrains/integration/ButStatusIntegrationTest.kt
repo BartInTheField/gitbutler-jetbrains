@@ -213,6 +213,70 @@ class ButStatusIntegrationTest {
     }
 
     @Test
+    fun applyUnapplyRoundTrip_branchLeavesAndRejoinsWorkspace() {
+        val repo = freshRepo("applyroundtrip")
+        exec(repo, "but branch new feature-x")
+        exec(repo, "echo x > x.txt")
+        exec(repo, "but commit feature-x -m 'x commit' --format json")
+
+        val before = status(repo)
+        assertTrue(
+            "feature-x must be in the workspace before unapply",
+            before.stacks.any { st -> st.branches.any { it.name == "feature-x" } },
+        )
+
+        but(repo, ButCommands.unapply("feature-x"))
+        val afterUnapply = status(repo)
+        assertFalse(
+            "feature-x must be gone from the workspace stacks after unapply",
+            afterUnapply.stacks.any { st -> st.branches.any { it.name == "feature-x" } },
+        )
+
+        but(repo, ButCommands.apply("feature-x"))
+        val afterApply = status(repo)
+        val branch = afterApply.stacks
+            .flatMap { it.branches }
+            .singleOrNull { it.name == "feature-x" }
+        assertNotNull("feature-x must be back in the workspace after apply", branch)
+        assertEquals("feature-x must keep its commit across the round trip", 1, branch!!.commits.size)
+        assertTrue(
+            "commit message should survive the round trip: ${branch.commits[0].message}",
+            branch.commits[0].message.contains("x commit"),
+        )
+    }
+
+    @Test
+    fun applyRemoteOnlyBranch_appearsAsLocalAppliedBranch() {
+        val repo = freshRepo("remoteapply")
+        val origin = "/work/remoteapply-origin.git"
+        exec("/", "rm -rf '$origin' && git init --bare '$origin'")
+        exec(repo, "git remote add origin '$origin' && git push origin main")
+
+        // Build the remote-only branch in a scratch clone so it never exists locally
+        // in the workspace repo — the plugin applies remote branches by SHORT name.
+        val scratch = "/work/remoteapply-scratch"
+        exec("/", "rm -rf '$scratch' && git clone '$origin' '$scratch'")
+        exec(
+            scratch,
+            "git checkout -b feature-remote && echo r > r.txt && git add r.txt && " +
+                "git commit -m 'remote work' && git push origin feature-remote",
+        )
+        exec(repo, "git fetch origin")
+
+        but(repo, ButCommands.apply("feature-remote"))
+
+        val s = status(repo)
+        val branch = s.stacks
+            .flatMap { it.branches }
+            .singleOrNull { it.name == "feature-remote" }
+        assertNotNull("feature-remote must appear as a local applied branch", branch)
+        assertTrue(
+            "applied branch should carry the remote commit: ${branch!!.commits.map { it.message }}",
+            branch.commits.any { it.message.contains("remote work") },
+        )
+    }
+
+    @Test
     fun parallelStacksWithStagedChange_assignedToCorrectStack() {
         val repo = freshRepo("parallel")
         exec(repo, "but branch new alpha")

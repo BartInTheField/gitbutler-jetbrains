@@ -11,12 +11,20 @@ import com.intellij.openapi.project.Project
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Service(Service.Level.PROJECT)
 class GitButlerService(private val project: Project) {
 
     @Volatile
     private var cachedExecutable: String? = null
+
+    /**
+     * True while a workspace mutation started from the branch menu is running; callers
+     * gate on it (compareAndSet before starting, set(false) when finished) so `but`
+     * mutations never overlap.
+     */
+    val mutationInFlight = AtomicBoolean(false)
 
     /**
      * True iff some git repository of this project has current branch named exactly
@@ -124,6 +132,27 @@ class GitButlerService(private val project: Project) {
         return ButResult.Ok(Unit)
     }
 
+    /** Runs `but apply <branchName> --format json`. Ok on exit 0. Not on EDT. */
+    fun apply(branchName: String): ButResult<Unit> {
+        assertBackgroundThread()
+
+        val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
+        val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
+
+        val output = when (
+            val r = runBut(exe, repoRoot, ButCommands.apply(branchName))
+        ) {
+            is ButResult.Ok -> r.value
+            is ButResult.Err -> return r
+        }
+
+        if (output.exitCode != 0) {
+            return ButResult.Err(ButJsonParser.parseErrorMessage(output.stdout.ifBlank { output.stderr }))
+        }
+
+        return ButResult.Ok(Unit)
+    }
+
     /** Runs `but unapply <branchName> --format json`. Ok on exit 0. Not on EDT. */
     fun unapply(branchName: String): ButResult<Unit> {
         assertBackgroundThread()
@@ -132,7 +161,7 @@ class GitButlerService(private val project: Project) {
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
         val output = when (
-            val r = runBut(exe, repoRoot, listOf("unapply", branchName, "--format", "json"))
+            val r = runBut(exe, repoRoot, ButCommands.unapply(branchName))
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r

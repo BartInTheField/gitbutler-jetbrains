@@ -44,6 +44,7 @@ The plugin adds two GitButler surfaces to the IDE, both active only when your pr
 - 🚀 **Commit and Push…** — also pushes the virtual branch (`but push`)
 - 🌳 **GitButler tool window** — live `but status` tree with VCS-colored file rows, diff-on-double-click, and jump-to-commit in the Git Log
 - 🧰 **Workspace actions in-IDE** — Pull Workspace (`but pull`) from the toolbar; Unapply Branch and Push Branch from the branch context menu
+- 🌿 **GitButler submenu in the Git branch menu** — Apply / Unapply a branch right from the IDE's native branch context menu (remote-only branches can be applied too)
 - 🔄 **Auto-refreshing** — the tool window re-renders on git repository changes (500 ms debounced) and via a manual Refresh button
 - 🔔 **Clear notifications** — committed / committed & pushed / push failed / commit failed; a failed commit never loses your message
 - 💾 **Remembers your last-used branch** per project
@@ -91,6 +92,7 @@ The plugin registers a `CheckinHandler` that intercepts the commit flow and a to
 | Push (via *Commit and Push*, or tool-window context menu) | `but push <branch>` |
 | Pull Workspace toolbar button | `but pull` |
 | Unapply Branch context menu | `but unapply <branch>` |
+| GitButler submenu in the Git branch menu | `but apply <branch>` / `but unapply <branch>` |
 
 If no virtual branch is selected in the commit toolbar, the handler steps aside and IntelliJ's normal git commit runs untouched.
 
@@ -98,6 +100,7 @@ If no virtual branch is selected in the commit toolbar, the handler steps aside 
 
 - [Virtual-branch commit](docs/virtual-branch-commit.md) — the commit-window integration
 - [GitButler tool window](docs/tool-window.md) — the workspace tree, toolbar and branch context menu
+- [Git branch menu](docs/git-branch-menu.md) — the GitButler Apply/Unapply submenu in the native branch context menu
 
 ## 👩‍💻 Development
 
