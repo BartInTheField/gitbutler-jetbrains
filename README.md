@@ -92,7 +92,7 @@ Kotlin · IntelliJ Platform Gradle Plugin 2.x · JDK 21.
 
 ## 🔄 Continuous integration
 
-Every push to `main` runs [Woodpecker CI](https://ci.codeberg.org) (`.woodpecker.yml`): it builds the plugin and publishes a Codeberg release versioned with CalVer (`YYYY.M.D.<build>`), with the plugin `.zip` attached as an asset. The same CalVer version is stamped into the built plugin.
+[Woodpecker CI](https://ci.codeberg.org) (`.woodpecker.yml`) tests every PR and requires each PR to add a `CHANGELOG.md` entry. Releases are cut manually from the Woodpecker UI on `main`: CI builds a CalVer-versioned (`YYYY.M.D.<build>`) plugin `.zip` and publishes a Codeberg release with the `## Unreleased` changelog section as its body.
 
 ## 🚧 Known limitations
 

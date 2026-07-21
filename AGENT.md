@@ -18,6 +18,7 @@ Gradle needs a JDK 21 (`kotlin { jvmToolchain(21) }`). If there is no system Jav
 1. **Every behavior change ships with tests, and you run them** (`./gradlew test`) before declaring done. Pure parsing/mapping logic → unit test; anything touching the real `but` CLI contract → integration test (see below).
 2. **Every new feature or user-visible change updates `docs/`** — extend the matching page (`docs/virtual-branch-commit.md`, `docs/tool-window.md`) or add a new page for a new surface.
 3. **README.md and the plugin description stay lean.** `README.md` and `<description>` in `src/main/resources/META-INF/plugin.xml` get at most a one-line mention of a new feature; the full explanation lives in `docs/` and the README links to it. Never grow either into a manual.
+4. **Every PR adds a `CHANGELOG.md` entry** under `## Unreleased` in the matching section (Features / Fixes / Internal improvements). CI blocks PRs that don't touch `CHANGELOG.md`.
 
 ## Testing
 
@@ -50,7 +51,7 @@ Any change to `ButCommands`, `ButJsonParser`, `ButPathMapper`, or a new `but` su
 - Detect Commit-and-Push via `executor.id == "Git.Commit.And.Push.Executor"` — the class `git4idea.checkin.GitCommitAndPushExecutor` is Kotlin-`internal`, don't reference it.
 - The `CheckinHandlerFactory` must always return the real handler (never a dummy): it runs once at commit-UI creation, possibly before git repos register.
 - Branch names in `Presentation.setText` need `setText(text, false)` — `_`/`&` are otherwise eaten as mnemonics.
-- CI is Woodpecker on Codeberg (`.woodpecker.yml`): no docker-in-docker, so integration tests self-skip there and only unit tests gate PRs. Run integration tests locally before pushing CLI-contract changes. Releases are CalVer, stamped by CI via `-PpluginVersion`.
+- CI is Woodpecker on Codeberg (`.woodpecker.yml`): no docker-in-docker, so integration tests self-skip there and only unit tests gate PRs. Run integration tests locally before pushing CLI-contract changes. Releases are **not** automatic on merge: cut one by manually running the Woodpecker pipeline on `main`, which tests, versions (CalVer, unchanged, stamped via `-PpluginVersion`), builds, creates the Codeberg release with the `## Unreleased` section of `CHANGELOG.md` as its body, then commits the changelog cut back to `main`.
 
 ## Version control
 
