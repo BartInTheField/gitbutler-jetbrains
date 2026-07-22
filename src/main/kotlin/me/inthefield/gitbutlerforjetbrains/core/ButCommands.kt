@@ -9,6 +9,10 @@ object ButCommands {
 
     fun push(branchName: String): List<String> = listOf("push", branchName, "--format", "json")
 
+    fun apply(branchName: String): List<String> = listOf("apply", branchName, "--format", "json")
+
+    fun unapply(branchName: String): List<String> = listOf("unapply", branchName, "--format", "json")
+
     fun commit(branchName: String, message: String, cliIds: List<String>): List<String> =
         listOf(
             "commit",

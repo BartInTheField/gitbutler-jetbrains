@@ -8,6 +8,12 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+- GitButler submenu in the IDE's native Git branch context menu: Apply and
+  Unapply the selected branch via `but apply` / `but unapply`. Local branches
+  get both actions; remote branches get Apply (by short name, hidden when a
+  same-named local branch exists). Works on both the 2025.1 and 2026.1 IDE
+  lines. See [docs/git-branch-menu.md](docs/git-branch-menu.md).
+
 ### Fixes
 
 ### Internal improvements

@@ -4,7 +4,10 @@
     <vendor email="bart.in.t.veld@pm.me">BartInTheField</vendor>
 
     <description><![CDATA[
-        Adds GitButler virtual-branch support to the IntelliJ commit window, letting you assign changes to virtual branches without leaving the IDE.
+        Adds GitButler virtual-branch support to the IDE: commit to virtual branches straight from the IntelliJ commit window,
+        and browse your GitButler workspace in a dedicated tool window — unassigned changes, applied branches and their commits,
+        with diff navigation, pull, push, and unapply built in. The native Git branch menu gains a GitButler submenu
+        to apply or unapply a branch.
         <br/><br/>
         This is an <b>unofficial</b> plugin and is not affiliated with or endorsed by GitButler.
         The GitButler mark is used under its CC0-1.0 brand assets (github.com/gitbutlerapp/gitbutler-brand-assets).
@@ -26,5 +29,20 @@
                 description="Select the GitButler virtual branch to commit to">
             <add-to-group group-id="ChangesView.CommitToolbar" anchor="first"/>
         </action>
+        <group id="GitButler.BranchMenu"
+               class="me.inthefield.gitbutlerforjetbrains.branchmenu.GitButlerBranchActionGroup"
+               text="GitButler"
+               description="GitButler actions for the selected branch"
+               popup="true">
+            <action id="GitButler.ApplyBranch"
+                    class="me.inthefield.gitbutlerforjetbrains.branchmenu.GitButlerApplyBranchAction"
+                    text="Apply"
+                    description="Apply this branch to the GitButler workspace (but apply)"/>
+            <action id="GitButler.UnapplyBranch"
+                    class="me.inthefield.gitbutlerforjetbrains.branchmenu.GitButlerUnapplyBranchAction"
+                    text="Unapply"
+                    description="Remove this branch from the GitButler workspace (but unapply)"/>
+            <add-to-group group-id="Git.Branch" anchor="last"/>
+        </group>
     </actions>
 </idea-plugin>
