@@ -7,7 +7,12 @@ this file. On release, the Unreleased section becomes the release body.
 ## Unreleased
 
 ### Features
-
+- Workspace tool window gains actions: a **Pull Workspace** toolbar button
+  (`but pull`) and a per-branch right-click menu with **Unapply**
+  (`but unapply`) and **Push** (`but push`). All run as background tasks with
+  success/error balloons and a tree refresh, gated by a single in-flight flag
+  so operations never overlap; Pull is disabled outside a GitButler workspace.
+  See [docs/tool-window.md](docs/tool-window.md).
 - GitButler submenu in the IDE's native Git branch context menu: Apply and
   Unapply the selected branch via `but apply` / `but unapply`. Local branches
   get both actions; remote branches get Apply (by short name, hidden when a
