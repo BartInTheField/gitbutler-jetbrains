@@ -98,7 +98,7 @@ steps:
       - apk add --no-cache curl jq
       - set -e
       - VERSION=$(cat version.txt)
-      - ZIP=$(ls build/distributions/*.zip | head -1)
+      - ZIP=$(ls build/distributions/*-$VERSION.zip | head -1)
       # The release body is the '## Unreleased' section of CHANGELOG.md
       # (everything between '## Unreleased' and the next '## ' heading),
       # with empty '### ' subsections stripped and blank lines collapsed.
