@@ -186,7 +186,7 @@ steps:
       - git config user.name "woodpecker-ci"
       - git config user.email "ci@codeberg.org"
       - git add CHANGELOG.md
-      - git commit -m "chore: cut changelog for $VERSION [skip ci]"
+      - 'git commit -m "chore: cut changelog for $VERSION [skip ci]"'
       # Protects against anything having landed on main since the pipeline
       # started — replay the single changelog commit onto the current tip.
       - git fetch origin main
