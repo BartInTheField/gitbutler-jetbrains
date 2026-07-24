@@ -24,8 +24,8 @@ this file. On release, the Unreleased section becomes the release body.
 ### Internal improvements
 
 - Migrated the repository to GitHub and rewrote CI from Woodpecker to GitHub
-  Actions (`.github/workflows/ci.yml`): same changelog gate, test/build job,
-  and manual CalVer release flow, now using the GitHub API and `gh` CLI.
+  Actions: `ci.yml` runs the changelog gate and tests on PRs and pushes to
+  main, while releases live in a separate manually triggered `release.yml`.
 - Releases are now cut manually from the Woodpecker UI instead of on every
   push to main, and CI gates PRs on a CHANGELOG.md entry; the Unreleased
   section becomes the release body and is cut back into the changelog after
