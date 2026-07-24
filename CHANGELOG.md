@@ -7,6 +7,14 @@ this file. On release, the Unreleased section becomes the release body.
 ## Unreleased
 
 ### Features
+
+### Fixes
+
+### Internal improvements
+
+## 2026.7.24.1 - 2026-07-24
+
+### Features
 - Workspace tool window gains actions: a **Pull Workspace** toolbar button
   (`but pull`) and a per-branch right-click menu with **Unapply**
   (`but unapply`) and **Push** (`but push`). All run as background tasks with
