@@ -1,0 +1,180 @@
+# Only PRs, pushes to main, and manual runs spawn workflow runs — plain branch
+# pushes would otherwise start a vacuous pipeline that can race the PR
+# pipeline. Releases are cut by manually running this workflow on main from
+# the Actions tab (workflow_dispatch).
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Changelog gate: every PR must add an entry to CHANGELOG.md under
+  # '## Unreleased' — the release job later uses that section as the
+  # release body.
+  changelog:
+    name: Changelog gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a CHANGELOG.md entry
+        run: |
+          # Defensive: the three-dot diff below needs a merge base with the
+          # target branch, so make sure we have it locally.
+          git fetch origin "${{ github.base_ref }}"
+          # Require at least one ADDED, non-blank, non-heading line in the
+          # CHANGELOG.md diff — approximates "entry under '## Unreleased'" (it
+          # checks for added content lines, not their position); a deletion-only
+          # touch of the file does not pass.
+          ADDED=$(git diff -U0 "origin/${{ github.base_ref }}...HEAD" -- CHANGELOG.md | grep -E '^\+[^+]' | grep -vE '^\+##' | grep -vE '^\+[[:space:]]*$' || true)
+          if [ -n "$ADDED" ]; then
+            echo "CHANGELOG.md entry added — OK"
+          else
+            echo "ERROR: this PR does not add an entry to CHANGELOG.md."
+            echo "Add an entry under '## Unreleased' in the matching section"
+            echo "(Features / Fixes / Internal improvements) and push again."
+            exit 1
+          fi
+
+  # Unit tests + integration tests + plugin build. Runs on every PR, on pushes
+  # to main, and again before a manual release. The GitButler CLI integration
+  # tests need a Docker daemon; GitHub-hosted ubuntu runners provide one (unlike
+  # the previous Codeberg CI runners), so they now run instead of self-skipping.
+  test:
+    name: Test and build plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: ./gradlew test buildPlugin --no-daemon
+
+  # CalVer with a per-day counter: YYYY.M.D.N where N is 1 for the first release
+  # of the day and increments for each further release the same day. The counter
+  # is derived from existing releases, so it resets naturally each new day.
+  # This job (version + build + release + changelog-cut) only fires on manual
+  # runs on main — a manual run on a feature branch just tests.
+  release:
+    name: Cut release
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compute version
+        run: |
+          Y=$(date -u +%Y)
+          M=$(date -u +%m | sed 's/^0//')
+          D=$(date -u +%d | sed 's/^0//')
+          DATE="$Y.$M.$D"
+          MAX=$(gh release list --limit 200 --json tagName --jq '.[].tagName' \
+            | grep "^${DATE}\." | sed "s/^${DATE}\.//" | sort -n | tail -1 || true)
+          MAX=${MAX:-0}
+          VERSION="$DATE.$((MAX + 1))"
+          echo "$VERSION" > version.txt
+          echo "Version for this build: $VERSION"
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin --no-daemon "-PpluginVersion=$(cat version.txt)"
+
+      - name: Create GitHub release
+        run: |
+          set -e
+          VERSION=$(cat version.txt)
+          ZIP=$(ls build/distributions/*-"$VERSION".zip | head -1)
+          # The release body is the '## Unreleased' section of CHANGELOG.md
+          # (everything between '## Unreleased' and the next '## ' heading),
+          # with empty '### ' subsections stripped and blank lines collapsed.
+          NOTES=$(awk '/^## Unreleased$/{flag=1;next} /^## /{flag=0} flag' CHANGELOG.md)
+          NOTES=$(printf '%s\n' "$NOTES" | awk '
+            function flush() {
+              if (heading == "" || has) {
+                if (heading != "") print heading
+                printf "%s", buf
+              }
+              heading = ""; buf = ""; has = 0
+            }
+            /^### / { flush(); heading = $0; next }
+            { buf = buf $0 "\n"; if ($0 ~ /[^[:space:]]/) has = 1 }
+            END { flush() }
+          ' | awk '
+            NF { if (started && pending) print ""; print; started = 1; pending = 0; next }
+            { pending = 1 }
+          ')
+          if [ -z "$(printf '%s\n' "$NOTES" | grep -v '^###' | grep -v '^[[:space:]]*$' || true)" ]; then
+            echo "ERROR: the '## Unreleased' section of CHANGELOG.md has no entries."
+            echo "Add at least one changelog entry before cutting a release."
+            exit 1
+          fi
+          echo "Releasing $ZIP as $VERSION"
+          printf '%s\n' "$NOTES" > notes.md
+          # Create the release (attaches the plugin zip as a release asset) and
+          # let GitHub create the tag at this commit.
+          gh release create "$VERSION" "$ZIP" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --notes-file notes.md
+
+      # After a release, stamp the released version into CHANGELOG.md: the current
+      # '## Unreleased' heading becomes '## <VERSION> - <date>' and a fresh empty
+      # Unreleased scaffold is inserted above it. The commit carries [skip ci] so
+      # the push back to main does not trigger another workflow run.
+      - name: Cut changelog for next release
+        run: |
+          set -e
+          VERSION=$(cat version.txt)
+          TODAY=$(date -u +%Y-%m-%d)
+          awk -v ver="$VERSION" -v day="$TODAY" '
+            /^## Unreleased$/ && !done {
+              print "## Unreleased"
+              print ""
+              print "### Features"
+              print ""
+              print "### Fixes"
+              print ""
+              print "### Internal improvements"
+              print ""
+              print "## " ver " - " day
+              done=1
+              next
+            }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.md.new
+          mv CHANGELOG.md.new CHANGELOG.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore: cut changelog for $VERSION [skip ci]"
+          # Protects against anything having landed on main since the workflow
+          # started — replay the single changelog commit onto the current tip.
+          git fetch origin main
+          git rebase FETCH_HEAD
+          git push origin HEAD:main
