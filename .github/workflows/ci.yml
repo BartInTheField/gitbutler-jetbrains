@@ -78,9 +78,12 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      # RELEASE_TOKEN is a PAT whose user is on the main ruleset's bypass list,
+      # so the changelog-cut commit at the end of this job can be pushed to main.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: actions/setup-java@v4
         with:
