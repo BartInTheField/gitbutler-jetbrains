@@ -153,6 +153,58 @@ class ButJsonParserTest {
     }
 
     @Test
+    fun parseStatus_commitWithChanges_populatesCommitChanges() {
+        val json = """
+            {
+              "uncommittedChanges": [],
+              "stacks": [
+                {"cliId": "g0", "assignedChanges": [], "branches": [
+                  {"cliId": "ch", "name": "chore/branding", "branchStatus": "nothingToPush", "commits": [
+                    {
+                      "cliId": "8b",
+                      "commitId": "8b114f9",
+                      "message": "msg",
+                      "authorName": "Bart",
+                      "createdAt": "2026-07-20T18:57:28+00:00",
+                      "conflicted": false,
+                      "changes": [
+                        {"cliId": "tp:x", "filePath": "one.txt", "changeType": "modified"},
+                        {"cliId": "tp:y", "filePath": "two.txt", "changeType": "added"}
+                      ]
+                    },
+                    {
+                      "cliId": "9c",
+                      "commitId": "9c225f0",
+                      "message": "msg2",
+                      "authorName": "Bart",
+                      "createdAt": "2026-07-20T18:58:00+00:00",
+                      "conflicted": false
+                    }
+                  ]}
+                ]}
+              ]
+            }
+        """.trimIndent()
+
+        val status = ButJsonParser.parseStatus(json)
+
+        val commits = status.branches[0].commits
+        val commitWithChanges = commits[0]
+        assertEquals(2, commitWithChanges.changes.size)
+        assertEquals(
+            UncommittedChange(cliId = "tp:x", filePath = "one.txt", changeType = "modified"),
+            commitWithChanges.changes[0],
+        )
+        assertEquals(
+            UncommittedChange(cliId = "tp:y", filePath = "two.txt", changeType = "added"),
+            commitWithChanges.changes[1],
+        )
+
+        // no "changes" field -> emptyList()
+        assertTrue(commits[1].changes.isEmpty())
+    }
+
+    @Test
     fun parseStatus_missingCommitsAndBranchStatus_defaultToEmpty() {
         val json = """
             {

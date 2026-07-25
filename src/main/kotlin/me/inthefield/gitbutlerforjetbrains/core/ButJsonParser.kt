@@ -23,7 +23,9 @@ object ButJsonParser {
      * [UncommittedChange] instances appear in both the flat list and on the stack).
      *
      * Each branch carries its parsed commits and branchStatus (missing branchStatus -> "").
-     * Fields like changes, reviewId, ci, upstreamCommits, mergeBase and upstreamState are ignored.
+     * Fields like reviewId, ci, upstreamCommits, mergeBase and upstreamState are ignored.
+     * Each commit carries its parsed changes (missing "changes" -> emptyList()); branch-level
+     * "changes" fields, if any, are not parsed here.
      */
     fun parseStatus(json: String): WorkspaceStatus {
         val root = JsonParser.parseString(json).asJsonObject
@@ -127,6 +129,13 @@ object ButJsonParser {
     }
 
     private fun parseCommit(obj: JsonObject): ButCommit {
+        val changes = mutableListOf<UncommittedChange>()
+        val changesElement = obj.get("changes")
+        if (changesElement != null && changesElement.isJsonArray) {
+            changesElement.asJsonArray.forEach { element ->
+                parseChange(element)?.let { changes.add(it) }
+            }
+        }
         return ButCommit(
             cliId = stringOrEmpty(obj, "cliId"),
             commitId = stringOrEmpty(obj, "commitId"),
@@ -134,6 +143,7 @@ object ButJsonParser {
             authorName = stringOrEmpty(obj, "authorName"),
             createdAt = stringOrEmpty(obj, "createdAt"),
             conflicted = optBoolean(obj, "conflicted"),
+            changes = changes,
         )
     }
 

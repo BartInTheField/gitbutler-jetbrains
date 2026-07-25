@@ -257,14 +257,14 @@ class GitButlerService(private val project: Project) {
         return runSimpleMutation(exe, repoRoot, ButCommands.amend(commitId, mapResult.cliIds))
     }
 
-    /** Runs `but uncommit <commitId>`: moves the commit's changes back to uncommitted. Not on EDT. */
-    fun uncommit(commitId: String): ButResult<Unit> {
+    /** Runs `but uncommit <id>` with a commit id (whole commit) or file-in-commit id (single file). Not on EDT. */
+    fun uncommit(id: String): ButResult<Unit> {
         assertBackgroundThread()
 
         val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
-        return runSimpleMutation(exe, repoRoot, ButCommands.uncommit(commitId))
+        return runSimpleMutation(exe, repoRoot, ButCommands.uncommit(id))
     }
 
     /** Runs `but reword <commitId> -m <message>`. Not on EDT. */

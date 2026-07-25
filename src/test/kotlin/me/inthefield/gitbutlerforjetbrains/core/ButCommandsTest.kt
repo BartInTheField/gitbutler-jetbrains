@@ -7,7 +7,7 @@ class ButCommandsTest {
 
     @Test
     fun status_buildsFormatJsonArgs() {
-        assertEquals(listOf("status", "--format", "json"), ButCommands.status())
+        assertEquals(listOf("status", "-f", "--format", "json"), ButCommands.status())
     }
 
     @Test
