@@ -37,6 +37,11 @@ this file. On release, the Unreleased section becomes the release body.
   checked, or onto a commit to amend them into it (`but amend`) after a
   suppressible confirmation; CLI errors (e.g. locked files) surface as
   notifications. ([#5](https://github.com/BartInTheField/gitbutler-jetbrains/issues/5))
+- Commits in the tool window expand into the files they changed: double-click
+  a file to see its diff for that specific commit, or right-click it →
+  **Uncommit File** (`but uncommit <file-in-commit id>`) to move just that
+  file's change back to the working tree. Jumping to a commit in the Git Log
+  moved from double-click to a **Show in Git Log** context-menu entry.
 
 ### Fixes
 
@@ -44,8 +49,8 @@ this file. On release, the Unreleased section becomes the release body.
 
 - Local integration tests no longer silently self-skip with Docker installed:
   the test JVM overrides the IDE-pinned JNA native library (incompatible with
-  Testcontainers' JNA) and `docker-java.properties` pins Docker API 1.44 so
-  Docker Engine 29+ accepts the client.
+  Testcontainers' JNA) and `docker-java.properties` pins Docker API 1.41 so
+  Docker Engine 29+ accepts the client while pre-25 daemons keep working.
 - Migrated the repository to GitHub and rewrote CI from Woodpecker to GitHub
   Actions: `ci.yml` runs the changelog gate and tests on PRs and pushes to
   main, while releases live in a separate manually triggered `release.yml`.
