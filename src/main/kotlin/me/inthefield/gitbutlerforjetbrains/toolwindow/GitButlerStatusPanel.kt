@@ -36,8 +36,10 @@ import me.inthefield.gitbutlerforjetbrains.core.ButResult
 import me.inthefield.gitbutlerforjetbrains.core.ButStack
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import me.inthefield.gitbutlerforjetbrains.core.UncommittedChange
+import me.inthefield.gitbutlerforjetbrains.core.ButCommit
 import me.inthefield.gitbutlerforjetbrains.core.VirtualBranch
 import me.inthefield.gitbutlerforjetbrains.core.WorkspaceStatus
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
@@ -72,6 +74,19 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         setContent(JBScrollPane(tree))
         installActivation()
         installContextMenu()
+        GitButlerTreeDnD.install(
+            tree = tree,
+            project = project,
+            rowPayload = { path ->
+                when (val payload = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject) {
+                    is ChangeNode -> DnDRow.Change(payload.change.filePath)
+                    is BranchNode -> DnDRow.Branch(payload.branch.name)
+                    is CommitNode -> DnDRow.Commit(payload.commit.effectiveId(), payload.commit.message)
+                    else -> null
+                }
+            },
+            runOperation = ::runOperation,
+        )
     }
 
     /**
@@ -111,7 +126,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
 
             is CommitNode -> {
                 VcsLogContentUtil.runInMainLog(project) { logUi ->
-                    logUi.vcsLog.jumpToReference(payload.commitId)
+                    logUi.vcsLog.jumpToReference(payload.commit.commitId)
                 }
                 true
             }
@@ -147,7 +162,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         return actionToolbar.component
     }
 
-    /** Right-click menu on branch rows: unapply or push the selected branch. */
+    /** Right-click menu: unapply/push a selected branch, or rename/uncommit a selected commit. */
     private fun installContextMenu() {
         // Select the row under the cursor before the menu's update() reads the selection —
         // don't rely on the tree doing this on popup trigger.
@@ -169,6 +184,9 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         val group = DefaultActionGroup().apply {
             add(UnapplyBranchAction())
             add(PushBranchAction())
+            addSeparator()
+            add(RenameCommitAction())
+            add(UncommitAction())
         }
         PopupHandler.installPopupMenu(tree, group, "GitButlerStatusPopup")
     }
@@ -178,6 +196,15 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
         return (node?.userObject as? BranchNode)?.branch
     }
+
+    /** The [ButCommit] of the currently-selected [CommitNode], or null if the selection is elsewhere. */
+    private fun selectedCommit(): ButCommit? {
+        val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
+        return (node?.userObject as? CommitNode)?.commit
+    }
+
+    /** The stable id to pass to `but reword`/`but uncommit`: the GitButler change id, falling back to the sha. */
+    private fun ButCommit.effectiveId(): String = cliId.ifBlank { commitId }
 
     /**
      * Runs a GitButler mutation on a background thread (the service asserts non-EDT, which
@@ -310,7 +337,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 branchNode.add(DefaultMutableTreeNode(NoCommitsNode))
             } else {
                 branch.commits.forEach { commit ->
-                    branchNode.add(DefaultMutableTreeNode(CommitNode(commit.commitId, commit.message, commit.conflicted)))
+                    branchNode.add(DefaultMutableTreeNode(CommitNode(commit)))
                 }
             }
             rootNode.add(branchNode)
@@ -374,13 +401,68 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         }
     }
 
+    private inner class RenameCommitAction : AnAction() {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.setText("Rename Commit", false)
+            val commit = selectedCommit()
+            e.presentation.isEnabledAndVisible =
+                commit != null && commit.effectiveId().isNotBlank() && !operationInFlight
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val commit = selectedCommit() ?: return
+            val commitId = commit.effectiveId()
+            if (commitId.isBlank()) {
+                return
+            }
+            val newMessage = Messages.showMultilineInputDialog(
+                project,
+                "Commit message:",
+                "Rename Commit",
+                commit.message,
+                null,
+                null,
+            )
+            if (newMessage.isNullOrBlank() || newMessage == commit.message) {
+                return
+            }
+            runOperation("Renaming commit", "Commit renamed") {
+                GitButlerService.getInstance(project).reword(commitId, newMessage)
+            }
+        }
+    }
+
+    private inner class UncommitAction : AnAction() {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.setText("Uncommit", false)
+            val commit = selectedCommit()
+            e.presentation.isEnabledAndVisible =
+                commit != null && commit.effectiveId().isNotBlank() && !operationInFlight
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val commit = selectedCommit() ?: return
+            val commitId = commit.effectiveId()
+            if (commitId.isBlank()) {
+                return
+            }
+            runOperation("Uncommitting", "Commit uncommitted — changes are back in your working tree") {
+                GitButlerService.getInstance(project).uncommit(commitId)
+            }
+        }
+    }
+
     // --- Tree node payloads -------------------------------------------------
 
     private class UnassignedNode(val count: Int)
     private class AssignedNode(val count: Int)
     private class ChangeNode(val change: UncommittedChange)
     private class BranchNode(val branch: VirtualBranch)
-    private class CommitNode(val commitId: String, val message: String, val conflicted: Boolean)
+    private class CommitNode(val commit: ButCommit)
     private object NoCommitsNode
 
     private class StatusCellRenderer : ColoredTreeCellRenderer() {
@@ -424,9 +506,9 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 }
 
                 is CommitNode -> {
-                    append("${payload.commitId.take(7)} ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    append(payload.message.lineSequence().firstOrNull().orEmpty())
-                    if (payload.conflicted) {
+                    append("${payload.commit.commitId.take(7)} ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    append(payload.commit.message.lineSequence().firstOrNull().orEmpty())
+                    if (payload.commit.conflicted) {
                         append(" (conflicted)", SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor.RED))
                     }
                 }
