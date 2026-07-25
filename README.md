@@ -13,7 +13,7 @@ Commit to a virtual branch straight from the IntelliJ commit window, and see you
 [![License: MIT](https://img.shields.io/badge/License-MIT-74D3D1.svg?style=flat-square)](LICENSE)
 [![IntelliJ Platform](https://img.shields.io/badge/IntelliJ%20Platform-2025.1%2B-74D3D1?style=flat-square&logo=intellijidea&logoColor=white)](https://plugins.jetbrains.com/)
 [![Built with Kotlin](https://img.shields.io/badge/Kotlin-JDK%2021-74D3D1?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![CI: Woodpecker](https://img.shields.io/badge/CI-Woodpecker-74D3D1?style=flat-square&logo=woodpeckerci&logoColor=white)](https://ci.codeberg.org)
+[![CI: GitHub Actions](https://img.shields.io/badge/CI-GitHub%20Actions-74D3D1?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/BartInTheField/gitbutler-jetbrains/actions)
 
 </div>
 
@@ -114,7 +114,7 @@ Kotlin · IntelliJ Platform Gradle Plugin 2.x · JDK 21.
 
 ## 🔄 Continuous integration
 
-[Woodpecker CI](https://ci.codeberg.org) (`.woodpecker.yml`) tests every PR and requires each PR to add a `CHANGELOG.md` entry. Releases are cut manually from the Woodpecker UI on `main`: CI builds a CalVer-versioned (`YYYY.M.D.<build>`) plugin `.zip` and publishes a Codeberg release with the `## Unreleased` changelog section as its body.
+[GitHub Actions](https://github.com/BartInTheField/gitbutler-jetbrains/actions) (`.github/workflows/ci.yml`) tests every PR and push to `main`, and requires each PR to add a `CHANGELOG.md` entry. Releases live in a separate `release.yml` triggered manually from the Actions tab: it builds a CalVer-versioned (`YYYY.M.D.<build>`) plugin `.zip` and publishes a GitHub release with the `## Unreleased` changelog section as its body.
 
 ## 🚧 Known limitations
 
