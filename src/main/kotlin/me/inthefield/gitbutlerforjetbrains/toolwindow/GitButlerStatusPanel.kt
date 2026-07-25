@@ -20,10 +20,13 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.actions.diff.ShowDiffAction
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryChangeListener
+import git4idea.GitContentRevision
+import git4idea.GitRevisionNumber
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.JBColor
@@ -51,9 +54,9 @@ import javax.swing.tree.DefaultTreeModel
 
 /**
  * Renders the GitButler workspace as a tree — unassigned changes, then each stack's
- * branches and their commits — visually analogous to `but status`. A Refresh toolbar
- * button re-runs the load. `status()` always runs on a pooled thread; every Swing
- * mutation happens on the EDT.
+ * branches, their commits, and each commit's changed files — visually analogous to
+ * `but status`. A Refresh toolbar button re-runs the load. `status()` always runs on a
+ * pooled thread; every Swing mutation happens on the EDT.
  */
 class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel(true, true) {
 
@@ -91,10 +94,11 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     }
 
     /**
-     * Makes rows navigable: double-clicking or pressing Enter on a change row opens its
-     * working-tree diff, and on a commit row jumps to that commit in the Git Log. Other rows
-     * fall through to the default tree behaviour (expand/collapse). [activate] returns true only
-     * when it handled the node, so a double-click on a container still toggles it.
+     * Makes rows navigable: double-clicking or pressing Enter on a change row — an
+     * uncommitted change, or a file inside a commit — opens its diff. Commit rows are
+     * containers now, so a double-click on one just expands/collapses it, like a branch.
+     * [activate] returns true only when it handled the node, so a double-click on a
+     * container still toggles it.
      */
     private fun installActivation() {
         object : DoubleClickListener() {
@@ -125,10 +129,8 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 true
             }
 
-            is CommitNode -> {
-                VcsLogContentUtil.runInMainLog(project) { logUi ->
-                    logUi.vcsLog.jumpToReference(payload.commit.commitId)
-                }
+            is CommitFileNode -> {
+                openCommitFileDiff(payload.commit, payload.change)
                 true
             }
 
@@ -148,6 +150,28 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         // Untracked / unknown to VCS: fall back to opening the file, or silently do nothing.
         val file = root.findFileByRelativePath(change.filePath) ?: return
         OpenFileDescriptor(project, file).navigate(true)
+    }
+
+    /**
+     * Opens the diff for a single file as changed by [commit]: before-revision is the commit's
+     * parent (`<sha>^`), after-revision is the commit itself. Added/untracked files have no
+     * parent-side content; deleted files have no commit-side content.
+     */
+    private fun openCommitFileDiff(commit: ButCommit, change: UncommittedChange) {
+        val root = repoRoot() ?: return
+        val filePath = LocalFilePath("${root.path}/${change.filePath}", false)
+        val changeType = change.changeType.lowercase()
+        val beforeRevision = if (changeType == "added" || changeType == "untracked") {
+            null
+        } else {
+            GitContentRevision.createRevision(filePath, GitRevisionNumber("${commit.commitId}^"), project)
+        }
+        val afterRevision = if (changeType == "deleted") {
+            null
+        } else {
+            GitContentRevision.createRevision(filePath, GitRevisionNumber(commit.commitId), project)
+        }
+        ShowDiffAction.showDiffForChange(project, listOf(Change(beforeRevision, afterRevision)))
     }
 
     private fun repoRoot() = GitButlerService.getInstance(project).workspaceRepository()?.root
@@ -186,8 +210,10 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
             add(UnapplyBranchAction())
             add(PushBranchAction())
             addSeparator()
+            add(ShowInGitLogAction())
             add(RenameCommitAction())
             add(UncommitAction())
+            add(UncommitFileAction())
         }
         PopupHandler.installPopupMenu(tree, group, "GitButlerStatusPopup")
     }
@@ -202,6 +228,12 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     private fun selectedCommit(): ButCommit? {
         val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
         return (node?.userObject as? CommitNode)?.commit
+    }
+
+    /** The [CommitFileNode] payload of the currently-selected commit file row, or null if the selection is elsewhere. */
+    private fun selectedCommitFile(): CommitFileNode? {
+        val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
+        return node?.userObject as? CommitFileNode
     }
 
     /** The stable id to pass to `but reword`/`but uncommit`: the GitButler change id, falling back to the sha. */
@@ -319,7 +351,12 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
 
         treeModel.reload()
         tree.emptyText.text = ""
+        // Expand everything except commit file lists, which stay collapsed until the
+        // user opens them.
         TreeUtil.expandAll(tree)
+        TreeUtil.treeNodeTraverser(rootNode)
+            .filter { (it as? DefaultMutableTreeNode)?.userObject is CommitNode }
+            .forEach { tree.collapsePath(TreeUtil.getPath(rootNode, it)) }
     }
 
     private fun addStack(stack: ButStack) {
@@ -338,7 +375,11 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 branchNode.add(DefaultMutableTreeNode(NoCommitsNode))
             } else {
                 branch.commits.forEach { commit ->
-                    branchNode.add(DefaultMutableTreeNode(CommitNode(commit)))
+                    val commitNode = DefaultMutableTreeNode(CommitNode(commit))
+                    commit.changes.forEach { change ->
+                        commitNode.add(DefaultMutableTreeNode(CommitFileNode(commit, change)))
+                    }
+                    branchNode.add(commitNode)
                 }
             }
             rootNode.add(branchNode)
@@ -402,6 +443,22 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         }
     }
 
+    private inner class ShowInGitLogAction : AnAction() {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.setText("Show in Git Log", false)
+            e.presentation.isEnabledAndVisible = selectedCommit() != null
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val commit = selectedCommit() ?: return
+            VcsLogContentUtil.runInMainLog(project) { logUi ->
+                logUi.vcsLog.jumpToReference(commit.commitId)
+            }
+        }
+    }
+
     private inner class RenameCommitAction : AnAction() {
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
@@ -457,6 +514,28 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         }
     }
 
+    private inner class UncommitFileAction : AnAction() {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.setText("Uncommit File", false)
+            val commitFile = selectedCommitFile()
+            e.presentation.isEnabledAndVisible =
+                commitFile != null && commitFile.change.cliId.isNotBlank() && !operationInFlight
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val commitFile = selectedCommitFile() ?: return
+            val cliId = commitFile.change.cliId
+            if (cliId.isBlank()) {
+                return
+            }
+            runOperation("Uncommitting file", "File uncommitted — change is back in your working tree") {
+                GitButlerService.getInstance(project).uncommit(cliId)
+            }
+        }
+    }
+
     // --- Tree node payloads -------------------------------------------------
 
     private class UnassignedNode(val count: Int)
@@ -464,6 +543,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     private class ChangeNode(val change: UncommittedChange)
     private class BranchNode(val branch: VirtualBranch)
     private class CommitNode(val commit: ButCommit)
+    private class CommitFileNode(val commit: ButCommit, val change: UncommittedChange)
     private object NoCommitsNode
 
     private class StatusCellRenderer : ColoredTreeCellRenderer() {
@@ -486,16 +566,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 }
 
                 is ChangeNode -> {
-                    val statusAttributes = changeTypeAttributes(payload.change.changeType)
-                    append("${payload.change.changeType} ", statusAttributes)
-                    val path = payload.change.filePath
-                    val slash = path.lastIndexOf('/')
-                    if (slash >= 0) {
-                        append(path.substring(0, slash + 1), SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                        append(path.substring(slash + 1), statusAttributes)
-                    } else {
-                        append(path, statusAttributes)
-                    }
+                    appendChange(payload.change.changeType, payload.change.filePath)
                 }
 
                 is BranchNode -> {
@@ -514,9 +585,26 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                     }
                 }
 
+                is CommitFileNode -> {
+                    appendChange(payload.change.changeType, payload.change.filePath)
+                }
+
                 NoCommitsNode -> {
                     append("(no commits)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                 }
+            }
+        }
+
+        /** Shared by [ChangeNode] and [CommitFileNode]: changeType-colored prefix, then the path with a grayed directory and colored filename. */
+        private fun appendChange(changeType: String, filePath: String) {
+            val statusAttributes = changeTypeAttributes(changeType)
+            append("$changeType ", statusAttributes)
+            val slash = filePath.lastIndexOf('/')
+            if (slash >= 0) {
+                append(filePath.substring(0, slash + 1), SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                append(filePath.substring(slash + 1), statusAttributes)
+            } else {
+                append(filePath, statusAttributes)
             }
         }
 
