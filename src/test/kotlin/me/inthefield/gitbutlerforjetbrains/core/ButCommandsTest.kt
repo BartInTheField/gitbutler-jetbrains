@@ -40,4 +40,33 @@ class ButCommandsTest {
             ButCommands.commit("feature-a", "msg", listOf("aa")),
         )
     }
+
+    @Test
+    fun amend_joinsCliIdsWithCommas() {
+        assertEquals(
+            listOf("amend", "commit-1", "--changes", "aa,bb", "--format", "json"),
+            ButCommands.amend("commit-1", listOf("aa", "bb")),
+        )
+    }
+
+    @Test
+    fun amend_singleCliId_hasNoTrailingComma() {
+        assertEquals(
+            listOf("amend", "commit-1", "--changes", "aa", "--format", "json"),
+            ButCommands.amend("commit-1", listOf("aa")),
+        )
+    }
+
+    @Test
+    fun uncommit_buildsCommitIdArgs() {
+        assertEquals(listOf("uncommit", "commit-1", "--format", "json"), ButCommands.uncommit("commit-1"))
+    }
+
+    @Test
+    fun reword_buildsMessageArgs() {
+        assertEquals(
+            listOf("reword", "commit-1", "-m", "new message", "--format", "json"),
+            ButCommands.reword("commit-1", "new message"),
+        )
+    }
 }

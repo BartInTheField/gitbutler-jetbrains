@@ -185,6 +185,97 @@ class ButStatusIntegrationTest {
     }
 
     @Test
+    fun uncommit_movesCommitChangeBackToUncommitted() {
+        val repo = freshRepo("uncommit")
+        exec(repo, "but branch new feature-a")
+        exec(repo, "echo hi > hello.txt")
+
+        val before = status(repo)
+        val mapped = ButPathMapper.map(repo, listOf("$repo/hello.txt"), before.uncommittedChanges)
+        assertTrue("ButPathMapper must not report missing paths: ${mapped.missing}", mapped.missing.isEmpty())
+        but(repo, ButCommands.commit("feature-a", "add hello", mapped.cliIds))
+
+        val afterCommit = status(repo)
+        val branchBefore = afterCommit.stacks.single().branches.single { it.name == "feature-a" }
+        assertEquals("expected exactly one commit before uncommit", 1, branchBefore.commits.size)
+        val commitId = branchBefore.commits[0].cliId
+        assertTrue("commit cliId should be non-empty", commitId.isNotEmpty())
+
+        but(repo, ButCommands.uncommit(commitId))
+
+        val after = status(repo)
+        val branchAfter = after.stacks
+            .flatMap { it.branches }
+            .singleOrNull { it.name == "feature-a" }
+        assertTrue(
+            "feature-a should have no commits after uncommit",
+            branchAfter == null || branchAfter.commits.isEmpty(),
+        )
+        assertTrue(
+            "hello.txt should be back in uncommittedChanges after uncommit",
+            after.uncommittedChanges.any { it.filePath.endsWith("hello.txt") },
+        )
+    }
+
+    @Test
+    fun reword_changesCommitMessage() {
+        val repo = freshRepo("reword")
+        exec(repo, "but branch new feature-a")
+        exec(repo, "echo hi > hello.txt")
+
+        val before = status(repo)
+        val mapped = ButPathMapper.map(repo, listOf("$repo/hello.txt"), before.uncommittedChanges)
+        assertTrue("ButPathMapper must not report missing paths: ${mapped.missing}", mapped.missing.isEmpty())
+        but(repo, ButCommands.commit("feature-a", "original message", mapped.cliIds))
+
+        val afterCommit = status(repo)
+        val commit = afterCommit.stacks.single().branches.single { it.name == "feature-a" }.commits.single()
+        assertTrue("commit cliId should be non-empty", commit.cliId.isNotEmpty())
+
+        but(repo, ButCommands.reword(commit.cliId, "reworded message"))
+
+        val after = status(repo)
+        val reworded = after.stacks.single().branches.single { it.name == "feature-a" }.commits.single()
+        assertTrue(
+            "commit message should reflect the reword: ${reworded.message}",
+            reworded.message.contains("reworded message"),
+        )
+    }
+
+    @Test
+    fun amend_movesSecondChangeIntoExistingCommit_leavesBranchWithOneCommit() {
+        val repo = freshRepo("amend")
+        exec(repo, "but branch new feature-a")
+        exec(repo, "echo hi > hello.txt")
+
+        val before = status(repo)
+        val mapped = ButPathMapper.map(repo, listOf("$repo/hello.txt"), before.uncommittedChanges)
+        assertTrue("ButPathMapper must not report missing paths: ${mapped.missing}", mapped.missing.isEmpty())
+        but(repo, ButCommands.commit("feature-a", "add hello", mapped.cliIds))
+
+        exec(repo, "echo bye > goodbye.txt")
+        val withSecondChange = status(repo)
+        assertEquals("expected one new uncommitted change", 1, withSecondChange.uncommittedChanges.size)
+        val secondMapped = ButPathMapper.map(repo, listOf("$repo/goodbye.txt"), withSecondChange.uncommittedChanges)
+        assertTrue(
+            "ButPathMapper must not report missing paths: ${secondMapped.missing}",
+            secondMapped.missing.isEmpty(),
+        )
+        val commitId =
+            withSecondChange.stacks.single().branches.single { it.name == "feature-a" }.commits.single().cliId
+
+        but(repo, ButCommands.amend(commitId, secondMapped.cliIds))
+
+        val after = status(repo)
+        assertTrue(
+            "goodbye.txt should have left uncommittedChanges after amend",
+            after.uncommittedChanges.none { it.filePath.endsWith("goodbye.txt") },
+        )
+        val branch = after.stacks.single().branches.single { it.name == "feature-a" }
+        assertEquals("feature-a should still have exactly one commit after amend", 1, branch.commits.size)
+    }
+
+    @Test
     fun stackedBranches_bothBranchesInOneStack() {
         val repo = freshRepo("stacked")
         exec(repo, "but branch new bottom")
