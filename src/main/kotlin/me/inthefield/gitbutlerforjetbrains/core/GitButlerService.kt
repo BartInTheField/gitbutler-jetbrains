@@ -228,6 +228,70 @@ class GitButlerService(private val project: Project) {
         }
     }
 
+    /**
+     * Amends the given files into an existing commit:
+     * 1. run status(); map each path to its cliId via uncommittedChanges
+     * 2. Err listing the offending paths if any path has no cliId
+     * 3. run `but amend <commitId> --changes <ids>`. Not on EDT.
+     */
+    fun amend(commitId: String, filePaths: List<String>): ButResult<Unit> {
+        assertBackgroundThread()
+
+        if (filePaths.isEmpty()) {
+            return ButResult.Err("No files selected to amend")
+        }
+
+        val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
+        val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
+
+        val workspace = when (val statusResult = status()) {
+            is ButResult.Ok -> statusResult.value
+            is ButResult.Err -> return statusResult
+        }
+
+        val mapResult = ButPathMapper.map(repoRoot, filePaths, workspace.uncommittedChanges)
+        if (mapResult.missing.isNotEmpty()) {
+            return ButResult.Err("No uncommitted change found for: ${mapResult.missing.joinToString(", ")}")
+        }
+
+        return runSimpleMutation(exe, repoRoot, ButCommands.amend(commitId, mapResult.cliIds))
+    }
+
+    /** Runs `but uncommit <commitId>`: moves the commit's changes back to uncommitted. Not on EDT. */
+    fun uncommit(commitId: String): ButResult<Unit> {
+        assertBackgroundThread()
+
+        val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
+        val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
+
+        return runSimpleMutation(exe, repoRoot, ButCommands.uncommit(commitId))
+    }
+
+    /** Runs `but reword <commitId> -m <message>`. Not on EDT. */
+    fun reword(commitId: String, message: String): ButResult<Unit> {
+        assertBackgroundThread()
+
+        if (message.isBlank()) {
+            return ButResult.Err("Commit message must not be blank")
+        }
+
+        val repoRoot = repoRoot() ?: return ButResult.Err("No git repository found for this project")
+        val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
+
+        return runSimpleMutation(exe, repoRoot, ButCommands.reword(commitId, message))
+    }
+
+    private fun runSimpleMutation(exe: String, repoRoot: String, args: List<String>): ButResult<Unit> {
+        val output = when (val r = runBut(exe, repoRoot, args)) {
+            is ButResult.Ok -> r.value
+            is ButResult.Err -> return r
+        }
+        if (output.exitCode != 0) {
+            return ButResult.Err(ButJsonParser.parseErrorMessage(output.stdout.ifBlank { output.stderr }))
+        }
+        return ButResult.Ok(Unit)
+    }
+
     private fun runBut(
         exe: String,
         repoRoot: String,

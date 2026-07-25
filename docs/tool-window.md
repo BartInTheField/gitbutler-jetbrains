@@ -43,7 +43,25 @@ File rows are colored using the IDE's VCS `FileStatus` palette by change type, t
 | **Unapply Branch** | `but unapply <branch>` — stash-like: takes the branch out of the workspace without losing its work. Reversible. |
 | **Push Branch** | `but push <branch>` — pushes just that branch. |
 
-Both actions run as background tasks, surface a success or error balloon in the "GitButler" notification group, and refresh the tree when they finish. Actions are disabled while another GitButler operation is in flight so they can never overlap.
+All actions run as background tasks, surface a success or error balloon in the "GitButler" notification group, and refresh the tree when they finish. Actions are disabled while another GitButler operation is in flight so they can never overlap.
+
+## Context-menu actions (right-click a commit row)
+
+| Action | What it runs |
+|---|---|
+| **Rename Commit** | Prompts for a new commit message (prefilled with the current one), then runs `but reword <commit>` if you confirm a non-blank, changed message. |
+| **Uncommit** | `but uncommit <commit>` — removes the commit and moves its changes back into your working tree as uncommitted changes. No confirmation dialog. |
+
+Both actions target the GitButler change id of the selected commit and are disabled when no commit row is selected or another GitButler operation is in flight.
+
+## Drag and drop
+
+Drag one or more **uncommitted changes** from the tree to reassign them without leaving the tool window:
+
+- **Drop onto a branch** — preselects that branch in the commit toolbar and opens the IDE's Commit tool window with exactly the dragged files checked (everything else unchecked), so you finish the commit through the normal flow with the branch already chosen.
+- **Drop onto a commit** — amends the dragged files into that commit (`but amend`), after a confirmation you can permanently suppress with "Don't ask again". Locked-file or other `but` errors surface as a notification with the CLI's message.
+
+Only selections made entirely of uncommitted change rows can be dragged; branches and commits are the only valid drop targets.
 
 ## Auto-refresh
 

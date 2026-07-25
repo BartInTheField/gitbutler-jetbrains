@@ -24,4 +24,12 @@ object ButCommands {
             "--format",
             "json",
         )
+
+    fun amend(commitId: String, cliIds: List<String>): List<String> =
+        listOf("amend", commitId, "--changes", cliIds.joinToString(","), "--format", "json")
+
+    fun uncommit(commitId: String): List<String> = listOf("uncommit", commitId, "--format", "json")
+
+    fun reword(commitId: String, message: String): List<String> =
+        listOf("reword", commitId, "-m", message, "--format", "json")
 }
