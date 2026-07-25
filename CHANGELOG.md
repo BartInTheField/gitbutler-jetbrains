@@ -25,9 +25,10 @@ this file. On release, the Unreleased section becomes the release body.
   `but uncommit`, moving the commit's changes back into the working tree so
   they can be reassigned to another virtual branch. ([#7](https://github.com/BartInTheField/gitbutler-jetbrains/issues/7))
 - Drag-and-drop in the tool window: drag uncommitted changes onto a branch to
-  preselect it and open the IDE commit UI, or onto a commit to amend them into
-  it (`but amend`) after a suppressible confirmation; CLI errors (e.g. locked
-  files) surface as notifications. ([#5](https://github.com/BartInTheField/gitbutler-jetbrains/issues/5))
+  preselect it and open the IDE commit UI with exactly the dragged files
+  checked, or onto a commit to amend them into it (`but amend`) after a
+  suppressible confirmation; CLI errors (e.g. locked files) surface as
+  notifications. ([#5](https://github.com/BartInTheField/gitbutler-jetbrains/issues/5))
 
 ### Fixes
 

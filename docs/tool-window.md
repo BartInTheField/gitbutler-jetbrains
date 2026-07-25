@@ -58,7 +58,7 @@ Both actions target the GitButler change id of the selected commit and are disab
 
 Drag one or more **uncommitted changes** from the tree to reassign them without leaving the tool window:
 
-- **Drop onto a branch** — preselects that branch in the commit toolbar and opens the IDE's Commit tool window, so you finish the commit through the normal flow with the branch already chosen.
+- **Drop onto a branch** — preselects that branch in the commit toolbar and opens the IDE's Commit tool window with exactly the dragged files checked (everything else unchecked), so you finish the commit through the normal flow with the branch already chosen.
 - **Drop onto a commit** — amends the dragged files into that commit (`but amend`), after a confirmation you can permanently suppress with "Don't ask again". Locked-file or other `but` errors surface as a notification with the CLI's message.
 
 Only selections made entirely of uncommitted change rows can be dragged; branches and commits are the only valid drop targets.
