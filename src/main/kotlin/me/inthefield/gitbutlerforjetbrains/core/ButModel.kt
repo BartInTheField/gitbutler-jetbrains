@@ -7,6 +7,7 @@ data class ButCommit(
     val authorName: String,
     val createdAt: String,
     val conflicted: Boolean,
+    val changes: List<UncommittedChange> = emptyList(),
 )
 
 data class VirtualBranch(

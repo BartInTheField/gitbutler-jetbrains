@@ -42,7 +42,7 @@ Any change to `ButCommands`, `ButJsonParser`, `ButPathMapper`, or a new `but` su
 
 - `core/` — CLI plumbing: `GitButlerService` (project service, finds `but`, runs it), `ButCommands` (argument lists), `ButJsonParser` (JSON → model), `ButModel` (`WorkspaceStatus` etc.), `ButPathMapper` (absolute IDE paths → CLI change ids).
 - `commit/` — commit-window integration: `GitButlerCheckinHandlerFactory`/`GitButlerCheckinHandler` intercept the commit flow, `GitButlerBranchComboAction` is the toolbar selector, `GitButlerCommitSelection` holds the chosen branch per project.
-- `toolwindow/` — `GitButlerToolWindowFactory` + `GitButlerStatusPanel` render `but status` as a tree, auto-refreshed on `GitRepository.GIT_REPO_CHANGE` (500 ms debounce).
+- `toolwindow/` — `GitButlerToolWindowFactory` + `GitButlerStatusPanel` render `but status -f` as a tree (branches → commits → the files each commit changed), auto-refreshed on `GitRepository.GIT_REPO_CHANGE` (500 ms debounce); `GitButlerTreeDnDSupport` adds drag-and-drop of uncommitted changes onto branches and commits.
 - `src/main/resources/META-INF/plugin.xml` — extension points, tool window, actions, plugin description.
 
 ## Gotchas

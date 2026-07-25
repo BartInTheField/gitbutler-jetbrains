@@ -18,16 +18,16 @@ The panel renders `but status` as a single tree:
   - `unpushed` when the branch has unpushed commits (also shown for `completelyUnpushed`),
   - any other CLI status string is shown verbatim.
 - **Assigned changes (N)** — a child group under the *first* branch of a stack, containing the changes that are staged to that stack (mirroring the "staged to `<branch>`" lane in `but status`).
-- **Commits** — each commit under its branch renders as `<7-char sha> <message first line>`. Conflicted commits are marked in red with `(conflicted)`.
+- **Commits** — each commit under its branch renders as `<7-char sha> <message first line>`. Conflicted commits are marked in red with `(conflicted)`. Expand a commit to see the files it changed, rendered like other file rows.
 - **(no commits)** — placeholder shown under a branch that has no commits yet.
 
 File rows are colored using the IDE's VCS `FileStatus` palette by change type, the same colors the Commit tool window uses: added = green, modified = blue, deleted = the IDE's deleted color; renamed/moved files are shown with the modified color. Unknown change types fall back to the regular foreground.
 
 ## Navigation
 
-- **Double-click** or press **Enter** on a file row → opens the working-tree diff for that file. Files that aren't known to VCS (e.g. untracked) fall back to opening the file in the editor.
-- **Double-click** or press **Enter** on a commit row → jumps to that commit in the Git Log tool window.
-- **Double-click / Enter** on a container row (branch, group) toggles expansion, same as any tree.
+- **Double-click** or press **Enter** on an uncommitted file row → opens the working-tree diff for that file. Files that aren't known to VCS (e.g. untracked) fall back to opening the file in the editor.
+- **Double-click** or press **Enter** on a file row inside a commit → opens the diff for that file as changed by that commit (parent vs. commit).
+- **Double-click / Enter** on a container row (branch, commit, group) toggles expansion, same as any tree. Jumping to a commit in the Git Log moved to the commit's context menu (**Show in Git Log**).
 
 ## Toolbar actions
 
@@ -49,19 +49,26 @@ All actions run as background tasks, surface a success or error balloon in the "
 
 | Action | What it runs |
 |---|---|
+| **Show in Git Log** | Jumps to the commit in the Git Log tool window. |
 | **Rename Commit** | Prompts for a new commit message (prefilled with the current one), then runs `but reword <commit>` if you confirm a non-blank, changed message. |
 | **Uncommit** | `but uncommit <commit>` — removes the commit and moves its changes back into your working tree as uncommitted changes. No confirmation dialog. |
 
-Both actions target the GitButler change id of the selected commit and are disabled when no commit row is selected or another GitButler operation is in flight.
+Rename and Uncommit target the GitButler change id of the selected commit and are disabled when no commit row is selected or another GitButler operation is in flight.
+
+## Context-menu actions (right-click a file inside a commit)
+
+| Action | What it runs |
+|---|---|
+| **Uncommit File** | `but uncommit <file-in-commit id>` — takes just that file's change out of the commit and returns it to your working tree as an uncommitted change. |
 
 ## Drag and drop
 
 Drag one or more **uncommitted changes** from the tree to reassign them without leaving the tool window:
 
-- **Drop onto a branch** — preselects that branch in the commit toolbar and opens the IDE's Commit tool window with exactly the dragged files checked (everything else unchecked), so you finish the commit through the normal flow with the branch already chosen.
-- **Drop onto a commit** — amends the dragged files into that commit (`but amend`), after a confirmation you can permanently suppress with "Don't ask again". Locked-file or other `but` errors surface as a notification with the CLI's message.
+- **Drop onto a branch** — preselects that branch in the commit toolbar and opens the IDE's Commit tool window with exactly the dragged files checked and everything else unchecked, so you finish the commit through the normal flow with the branch already chosen. If the IDE is configured to commit through the modal dialog instead of the Commit tool window, the branch is still preselected but the checkboxes are left untouched.
+- **Drop onto a commit** — amends the dragged files into that commit (`but amend`), after a confirmation you can permanently suppress with "Don't ask again" (only ticking the box *and* confirming suppresses it). The amend runs as a background task with a success or error balloon and a tree refresh, like every other action. Locked-file or other `but` errors surface as a notification with the CLI's message.
 
-Only selections made entirely of uncommitted change rows can be dragged; branches and commits are the only valid drop targets.
+Only selections made entirely of uncommitted change rows can be dragged. Valid drop targets are branch rows and commit rows that carry a usable GitButler change id. Dragging is disabled entirely while another GitButler operation is in flight, so a drop can never overlap a running mutation.
 
 ## Auto-refresh
 
