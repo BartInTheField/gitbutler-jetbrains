@@ -47,18 +47,24 @@ object GitButlerTreeDnD {
 
     private val CHANGE_PATHS_FLAVOR = DataFlavor(List::class.java, "GitButler uncommitted change paths")
     private const val AMEND_CONFIRM_SUPPRESSED_KEY = "gitbutler.amend.confirm.suppressed"
+    private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(GitButlerTreeDnD::class.java)
 
     fun install(
         tree: JTree,
         project: Project,
         rowPayload: (TreePath) -> DnDRow?,
+        isOperationInFlight: () -> Boolean,
         runOperation: (title: String, successMessage: String, operation: () -> ButResult<Unit>) -> Unit,
     ) {
         tree.dragEnabled = true
         tree.dropMode = DropMode.ON
         tree.transferHandler = object : TransferHandler() {
 
+            // Gating on isOperationInFlight mirrors the context-menu actions' update():
+            // during a mutation the drag is visibly refused instead of silently no-oping
+            // in runOperation after the user already confirmed.
             override fun getSourceActions(c: JComponent): Int {
+                if (isOperationInFlight()) return NONE
                 val source = c as? JTree ?: return NONE
                 return if (draggableChangePaths(selectedPayloads(source, rowPayload)) != null) COPY else NONE
             }
@@ -70,12 +76,13 @@ object GitButlerTreeDnD {
             }
 
             override fun canImport(support: TransferSupport): Boolean {
+                if (isOperationInFlight()) return false
                 if (!support.isDrop || !support.isDataFlavorSupported(CHANGE_PATHS_FLAVOR)) return false
                 return dropTarget(dropRowPayload(support, rowPayload)) != null
             }
 
             override fun importData(support: TransferSupport): Boolean {
-                if (!support.isDrop) return false
+                if (!support.isDrop || isOperationInFlight()) return false
                 val target = dropTarget(dropRowPayload(support, rowPayload)) ?: return false
                 val paths = extractPaths(support.transferable)
                 if (paths.isNullOrEmpty()) return false
@@ -131,6 +138,7 @@ object GitButlerTreeDnD {
         return try {
             transferable.getTransferData(CHANGE_PATHS_FLAVOR) as? List<String>
         } catch (e: Exception) {
+            LOG.warn("Failed to read dragged change paths", e)
             null
         }
     }

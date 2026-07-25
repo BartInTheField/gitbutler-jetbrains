@@ -85,6 +85,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                     else -> null
                 }
             },
+            isOperationInFlight = { operationInFlight },
             runOperation = ::runOperation,
         )
     }
