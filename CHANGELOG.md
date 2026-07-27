@@ -8,6 +8,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+### Fixes
+
+### Internal improvements
+
+## 2026.7.27.1 - 2026-07-27
+
+### Features
+
 - Rename a commit from the tool window: right-click a commit row → **Rename
   Commit** opens a dialog prefilled with the current message and runs
   `but reword`. ([#6](https://github.com/BartInTheField/gitbutler-jetbrains/issues/6))
