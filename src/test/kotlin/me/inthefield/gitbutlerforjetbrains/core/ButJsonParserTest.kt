@@ -259,66 +259,20 @@ class ButJsonParserTest {
 
     @Test
     fun parseCommitResult_success_returnsOkWithCommitId() {
+        // but 0.22 emits a flat {commitId, changeId, branch} object on success.
         val json = """
-            {"result": {"commit_id": "059d24", "branch": "feature-one", "branch_tip": "059d24", "rejected": []}, "status": {}}
+            {"commitId": "35902587083f73a3", "changeId": "tslomtqmxlxosvkr", "branch": "feat"}
         """.trimIndent()
 
         val result = ButJsonParser.parseCommitResult(json)
 
         assertTrue(result is ButResult.Ok)
-        assertEquals("059d24", (result as ButResult.Ok).value)
+        assertEquals("35902587083f73a3", (result as ButResult.Ok).value)
     }
 
     @Test
-    fun parseCommitResult_nonEmptyRejected_returnsErrMentioningPath() {
-        val json = """
-            {"result": {"commit_id": "059d24", "branch": "feature-one", "rejected": [
-              {"cliId": "zz", "filePath": "locked.txt", "changeType": "modified"}
-            ]}, "status": {}}
-        """.trimIndent()
-
-        val result = ButJsonParser.parseCommitResult(json)
-
-        assertTrue(result is ButResult.Err)
-        assertTrue(
-            "expected rejected path in message",
-            (result as ButResult.Err).message.contains("locked.txt"),
-        )
-    }
-
-    @Test
-    fun parseCommitResult_flatTopLevelShape_returnsOkWithCommitId() {
-        // but 0.21.0 (observed on Linux) emits the fields at the top level, no "result" wrapper.
-        val json = """
-            {"commit_id": "334cacf3", "branch": "fa", "branch_tip": "334cacf3", "rejected": []}
-        """.trimIndent()
-
-        val result = ButJsonParser.parseCommitResult(json)
-
-        assertTrue(result is ButResult.Ok)
-        assertEquals("334cacf3", (result as ButResult.Ok).value)
-    }
-
-    @Test
-    fun parseCommitResult_flatTopLevelRejected_returnsErr() {
-        val json = """
-            {"commit_id": "334cacf3", "branch": "fa", "rejected": [
-              {"cliId": "zz", "filePath": "locked.txt", "changeType": "modified"}
-            ]}
-        """.trimIndent()
-
-        val result = ButJsonParser.parseCommitResult(json)
-
-        assertTrue(result is ButResult.Err)
-        assertTrue(
-            "expected rejected path in message",
-            (result as ButResult.Err).message.contains("locked.txt"),
-        )
-    }
-
-    @Test
-    fun parseCommitResult_missingResultField_isSuccessWithUnknownId() {
-        // Exit code 0 is the success signal; an output shape without "result"
+    fun parseCommitResult_missingCommitId_isSuccessWithUnknownId() {
+        // Exit code 0 is the success signal; an output shape without "commitId"
         // must not be reported as a failed commit.
         val json = """{"status": {"uncommittedChanges": [], "stacks": []}}"""
 

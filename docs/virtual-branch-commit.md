@@ -20,12 +20,12 @@ The plugin remembers the last-used virtual branch per project.
 
 ## CLI commands used
 
-Every GitButler action runs the `but` CLI with `--format json` (plus `BUT_OUTPUT_FORMAT=json` in the environment):
+Every GitButler action runs the `but` CLI with `--json` (plus `BUT_OUTPUT_FORMAT=json` in the environment):
 
 | Step | Command |
 |---|---|
 | List branches; map file paths → change IDs | `but status` |
-| Commit the selected changes | `but commit <branch> -m <message> --changes <ids>` |
+| Commit the selected changes | `but commit -b <branch> -m <message> <change-ids>` |
 | Push (only for *Commit and Push*) | `but push <branch>` |
 
 If no virtual branch is picked, the plugin's checkin handler steps aside and IntelliJ's normal git commit runs untouched.
@@ -44,4 +44,4 @@ All commit outcomes land in the "GitButler" notification group:
 
 - Single git repository per project.
 - Virtual branches with identical names across stacks are ambiguous — the CLI is invoked by branch name.
-- There's no way to create a new virtual branch from the commit window yet. (`but commit -c` is the natural hook for this.)
+- There's no way to create a new virtual branch from the commit window yet. (`but commit -b <new-branch>` is the natural hook for this.)
