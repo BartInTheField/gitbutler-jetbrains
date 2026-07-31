@@ -24,9 +24,9 @@ Every GitButler action runs the `but` CLI with `--json` (plus `BUT_OUTPUT_FORMAT
 
 | Step | Command |
 |---|---|
-| List branches; map file paths → change IDs | `but status` |
-| Commit the selected changes | `but commit -b <branch> -m <message> <change-ids>` |
-| Push (only for *Commit and Push*) | `but push <branch>` |
+| List branches; map file paths → change IDs | `but status -f --json` |
+| Commit the selected changes | `but commit -b <branch> -m <message> --json <change-ids>` |
+| Push (only for *Commit and Push*) | `but push <branch> --json` |
 
 If no virtual branch is picked, the plugin's checkin handler steps aside and IntelliJ's normal git commit runs untouched.
 

@@ -16,6 +16,11 @@ class ButCommandsTest {
     }
 
     @Test
+    fun pull_buildsJsonArgs() {
+        assertEquals(listOf("pull", "--json"), ButCommands.pull())
+    }
+
+    @Test
     fun apply_buildsBranchArgs() {
         assertEquals(listOf("apply", "feature-a", "--json"), ButCommands.apply("feature-a"))
     }

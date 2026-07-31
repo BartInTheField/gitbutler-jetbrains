@@ -9,6 +9,8 @@ object ButCommands {
 
     fun push(branchName: String): List<String> = listOf("push", branchName, "--json")
 
+    fun pull(): List<String> = listOf("pull", "--json")
+
     fun apply(branchName: String): List<String> = listOf("apply", branchName, "--json")
 
     fun unapply(branchName: String): List<String> = listOf("unapply", branchName, "--json")

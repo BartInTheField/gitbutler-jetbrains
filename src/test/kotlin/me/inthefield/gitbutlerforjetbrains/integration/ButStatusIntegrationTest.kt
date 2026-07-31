@@ -115,6 +115,15 @@ class ButStatusIntegrationTest {
     private fun status(repoDir: String): WorkspaceStatus =
         ButJsonParser.parseStatus(but(repoDir, ButCommands.status()))
 
+    /**
+     * Commits every uncommitted change in [repoDir] to [branch] through the plugin's own
+     * [ButCommands.commit] — the same path->cliId->commit flow GitButlerService.commit takes.
+     */
+    private fun commitAll(repoDir: String, branch: String, message: String): String {
+        val ids = status(repoDir).uncommittedChanges.map { it.cliId }
+        return but(repoDir, ButCommands.commit(branch, message, ids))
+    }
+
     @Test
     fun freshWorkspace_hasNoChangesAndNoStacks() {
         val repo = freshRepo("fresh")
@@ -280,10 +289,10 @@ class ButStatusIntegrationTest {
         val repo = freshRepo("stacked")
         exec(repo, "but branch new bottom")
         exec(repo, "echo b > b.txt")
-        exec(repo, "but commit -b bottom -m 'bottom commit'")
+        commitAll(repo, "bottom", "bottom commit")
         exec(repo, "but branch new top --anchor bottom")
         exec(repo, "echo t > t.txt")
-        exec(repo, "but commit -b top -m 'top commit'")
+        commitAll(repo, "top", "top commit")
 
         val s = status(repo)
 
@@ -308,7 +317,7 @@ class ButStatusIntegrationTest {
         val repo = freshRepo("applyroundtrip")
         exec(repo, "but branch new feature-x")
         exec(repo, "echo x > x.txt")
-        exec(repo, "but commit -b feature-x -m 'x commit'")
+        commitAll(repo, "feature-x", "x commit")
 
         val before = status(repo)
         assertTrue(
@@ -390,5 +399,16 @@ class ButStatusIntegrationTest {
             "no stack may report assigned changes now that CLI staging is gone",
             s.stacks.all { it.assignedChanges.isEmpty() },
         )
+    }
+
+    @Test
+    fun pull_onFreshWorkspace_succeedsAndReportsUpToDate() {
+        val repo = freshRepo("pull")
+
+        // `but setup --init` wires a local `gb-local` remote, so pull needs no network and
+        // is up to date. Exercised through the plugin's own ButCommands.pull(); exec() asserts
+        // exit 0, so this validates the pull command contract end-to-end.
+        val out = but(repo, ButCommands.pull())
+        assertTrue("pull output should report up_to_date: $out", out.contains("up_to_date"))
     }
 }

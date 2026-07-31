@@ -89,15 +89,15 @@ The plugin registers a `CheckinHandler` that intercepts the commit flow and a to
 
 | Step | Command |
 |---|---|
-| List branches, map files → change IDs; render the tool window | `but status` |
-| Commit exactly the selected changes | `but commit -b <branch> -m <message> <change-ids>` |
-| Push (via *Commit and Push*, or tool-window context menu) | `but push <branch>` |
-| Pull Workspace toolbar button | `but pull` |
-| Unapply Branch context menu | `but unapply <branch>` |
-| GitButler submenu in the Git branch menu | `but apply <branch>` / `but unapply <branch>` |
-| Rename Commit context menu | `but reword <commit> -m <message>` |
-| Uncommit / Uncommit File context menu | `but uncommit <commit-or-file-in-commit id>` |
-| Amend by dropping changes onto a commit | `but amend -t <commit> <change-ids>` |
+| List branches, map files → change IDs; render the tool window | `but status -f --json` |
+| Commit exactly the selected changes | `but commit -b <branch> -m <message> --json <change-ids>` |
+| Push (via *Commit and Push*, or tool-window context menu) | `but push <branch> --json` |
+| Pull Workspace toolbar button | `but pull --json` |
+| Unapply Branch context menu | `but unapply <branch> --json` |
+| GitButler submenu in the Git branch menu | `but apply <branch> --json` / `but unapply <branch> --json` |
+| Rename Commit context menu | `but reword <commit> -m <message> --json` |
+| Uncommit / Uncommit File context menu | `but uncommit <commit-or-file-in-commit id> --json` |
+| Amend by dropping changes onto a commit | `but amend -t <commit> --json <change-ids>` |
 
 If no virtual branch is selected in the commit toolbar, the handler steps aside and IntelliJ's normal git commit runs untouched.
 

@@ -119,7 +119,7 @@ class GitButlerService(private val project: Project) {
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
         val output = when (
-            val r = runBut(exe, repoRoot, listOf("pull", "--json"), PUSH_TIMEOUT_MS)
+            val r = runBut(exe, repoRoot, ButCommands.pull(), PUSH_TIMEOUT_MS)
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
