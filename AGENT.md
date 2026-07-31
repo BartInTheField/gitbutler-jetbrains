@@ -1,6 +1,6 @@
 # Agent guide — GitButler for JetBrains IDEs
 
-Unofficial IntelliJ plugin (Kotlin, JDK 21, IntelliJ Platform Gradle Plugin 2.x, IC 2025.1+) that integrates GitButler virtual branches into the IDE: a branch selector in the commit window and a workspace tool window. All GitButler operations shell out to the `but` CLI with `--format json`. Active only when the project is on the `gitbutler/workspace` branch.
+Unofficial IntelliJ plugin (Kotlin, JDK 21, IntelliJ Platform Gradle Plugin 2.x, IC 2025.1+) that integrates GitButler virtual branches into the IDE: a branch selector in the commit window and a workspace tool window. All GitButler operations shell out to the `but` CLI (0.22.0+) with `--json`. Active only when the project is on the `gitbutler/workspace` branch.
 
 ## Commands
 
@@ -47,7 +47,7 @@ Any change to `ButCommands`, `ButJsonParser`, `ButPathMapper`, or a new `but` su
 
 ## Gotchas
 
-- `but commit` JSON shape **varies by platform**: nested `{result:{commit_id,...}}` and flat `{commit_id,...}` both occur — `ButJsonParser.parseCommitResult` handles both; keep it tolerant. `but push` failure output is plain text, not JSON.
+- `but commit` (0.22) succeeds by exit code 0 and emits `{commitId, changeId, branch}` — `ButJsonParser.parseCommitResult` reads `commitId` and treats a missing id as a still-successful commit. Rejections (dependency locks, merged-upstream) come back as exit 1 with a plain-text stderr message, not a JSON `rejected` array. `but push` failure output is plain text, not JSON.
 - Detect Commit-and-Push via `executor.id == "Git.Commit.And.Push.Executor"` — the class `git4idea.checkin.GitCommitAndPushExecutor` is Kotlin-`internal`, don't reference it.
 - The `CheckinHandlerFactory` must always return the real handler (never a dummy): it runs once at commit-UI creation, possibly before git repos register.
 - Branch names in `Presentation.setText` need `setText(text, false)` — `_`/`&` are otherwise eaten as mnemonics.

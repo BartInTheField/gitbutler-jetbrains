@@ -10,6 +10,11 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Fixes
 
+- Compatibility with GitButler `but` 0.22.0, which overhauled the CLI: commands now
+  use `--json` (was `--format json`), `but commit` takes changes positionally with
+  `-b/--branch` for the target branch, `but amend` uses `-t/--target`, and the commit
+  result is a flat `{commitId, ...}` object. Requires `but` 0.22.0+.
+
 ### Internal improvements
 
 ## 2026.7.27.1 - 2026-07-27

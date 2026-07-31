@@ -19,7 +19,7 @@ import org.testcontainers.images.builder.ImageFromDockerfile
 
 /**
  * Integration tests that run the REAL GitButler `but` CLI inside a Docker container
- * against real git repos, capture its `--format json` output, and feed it through the
+ * against real git repos, capture its `--json` output, and feed it through the
  * plugin's own [ButCommands] (exact argument lists), [ButPathMapper] (path -> cliId)
  * and [ButJsonParser]. Asserts on the parsed [WorkspaceStatus] model — this validates
  * the plugin's CLI contract end-to-end.
@@ -27,7 +27,7 @@ import org.testcontainers.images.builder.ImageFromDockerfile
  * The CLI version deliberately floats to the latest release (the installer API has no
  * pin mechanism): these tests exist to catch contract drift when GitButler updates.
  * The installed version is printed at container startup for diagnosis. Behavior
- * comments marked "Observed on but 0.21.0" may legitimately change with newer CLIs —
+ * comments marked "Observed on but 0.22.0" may legitimately change with newer CLIs —
  * a failure there means the plugin's assumptions need re-checking, not a broken test.
  *
  * The whole class is skipped (not failed) when Docker is unavailable.
@@ -114,6 +114,15 @@ class ButStatusIntegrationTest {
     /** Runs the plugin's own status command ([ButCommands.status]) and parses it into the plugin model. */
     private fun status(repoDir: String): WorkspaceStatus =
         ButJsonParser.parseStatus(but(repoDir, ButCommands.status()))
+
+    /**
+     * Commits every uncommitted change in [repoDir] to [branch] through the plugin's own
+     * [ButCommands.commit] — the same path->cliId->commit flow GitButlerService.commit takes.
+     */
+    private fun commitAll(repoDir: String, branch: String, message: String): String {
+        val ids = status(repoDir).uncommittedChanges.map { it.cliId }
+        return but(repoDir, ButCommands.commit(branch, message, ids))
+    }
 
     @Test
     fun freshWorkspace_hasNoChangesAndNoStacks() {
@@ -280,10 +289,10 @@ class ButStatusIntegrationTest {
         val repo = freshRepo("stacked")
         exec(repo, "but branch new bottom")
         exec(repo, "echo b > b.txt")
-        exec(repo, "but commit bottom -m 'bottom commit' --format json")
+        commitAll(repo, "bottom", "bottom commit")
         exec(repo, "but branch new top --anchor bottom")
         exec(repo, "echo t > t.txt")
-        exec(repo, "but commit top -m 'top commit' --format json")
+        commitAll(repo, "top", "top commit")
 
         val s = status(repo)
 
@@ -291,7 +300,7 @@ class ButStatusIntegrationTest {
         val branches = s.stacks[0].branches
         assertEquals("stack should hold both branches", 2, branches.size)
 
-        // Observed on but 0.21.0: branches are emitted TOP-FIRST (index 0 = top, index 1 = bottom).
+        // Observed on but 0.22.0: branches are emitted TOP-FIRST (index 0 = top, index 1 = bottom).
         assertEquals("expected top-first ordering", "top", branches[0].name)
         assertEquals("expected bottom second", "bottom", branches[1].name)
 
@@ -308,7 +317,7 @@ class ButStatusIntegrationTest {
         val repo = freshRepo("applyroundtrip")
         exec(repo, "but branch new feature-x")
         exec(repo, "echo x > x.txt")
-        exec(repo, "but commit feature-x -m 'x commit' --format json")
+        commitAll(repo, "feature-x", "x commit")
 
         val before = status(repo)
         assertTrue(
@@ -368,7 +377,7 @@ class ButStatusIntegrationTest {
     }
 
     @Test
-    fun parallelStacksWithStagedChange_assignedToCorrectStack() {
+    fun parallelStacks_uncommittedChangeStaysUnassigned() {
         val repo = freshRepo("parallel")
         exec(repo, "but branch new alpha")
         exec(repo, "but branch new beta")
@@ -377,24 +386,29 @@ class ButStatusIntegrationTest {
         assertEquals("two independent branches must be TWO stacks", 2, twoStacks.stacks.size)
 
         exec(repo, "echo a > a.txt")
-        exec(repo, "but stage a.txt alpha")
 
         val s = status(repo)
 
-        // The parser merges each stack's assignedChanges into the flat uncommittedChanges list,
-        // so the staged change must appear in BOTH places.
+        // but 0.22 removed CLI change assignment: every worktree change is uncommitted and
+        // belongs to no stack, so it appears in the flat list with no stack claiming it.
         assertTrue(
-            "staged a.txt must appear in flat uncommittedChanges",
+            "a.txt must appear in flat uncommittedChanges",
             s.uncommittedChanges.any { it.filePath.endsWith("a.txt") },
         )
+        assertTrue(
+            "no stack may report assigned changes now that CLI staging is gone",
+            s.stacks.all { it.assignedChanges.isEmpty() },
+        )
+    }
 
-        val alpha = s.stacks.single { st -> st.branches.any { it.name == "alpha" } }
-        val beta = s.stacks.single { st -> st.branches.any { it.name == "beta" } }
+    @Test
+    fun pull_onFreshWorkspace_succeedsAndReportsUpToDate() {
+        val repo = freshRepo("pull")
 
-        assertEquals("a.txt must be assigned to the alpha stack", 1, alpha.assignedChanges.size)
-        val assigned = alpha.assignedChanges[0]
-        assertTrue("assigned file should be a.txt: ${assigned.filePath}", assigned.filePath.endsWith("a.txt"))
-        assertNotNull(assigned.cliId)
-        assertTrue("beta stack must have no assigned changes", beta.assignedChanges.isEmpty())
+        // `but setup --init` wires a local `gb-local` remote, so pull needs no network and
+        // is up to date. Exercised through the plugin's own ButCommands.pull(); exec() asserts
+        // exit 0, so this validates the pull command contract end-to-end.
+        val out = but(repo, ButCommands.pull())
+        assertTrue("pull output should report up_to_date: $out", out.contains("up_to_date"))
     }
 }

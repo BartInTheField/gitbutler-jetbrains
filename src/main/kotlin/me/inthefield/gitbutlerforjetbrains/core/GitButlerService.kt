@@ -62,7 +62,7 @@ class GitButlerService(private val project: Project) {
     }
 
     /**
-     * Runs `but status --format json`. Must NOT be called on the EDT. Err with a readable
+     * Runs `but status -f --json`. Must NOT be called on the EDT. Err with a readable
      * message when binary missing, exit != 0, or parse failure.
      */
     fun status(): ButResult<WorkspaceStatus> {
@@ -87,7 +87,7 @@ class GitButlerService(private val project: Project) {
         }
     }
 
-    /** Runs `but push <branchName> --format json`. Ok on exit 0. Not on EDT. */
+    /** Runs `but push <branchName> --json`. Ok on exit 0. Not on EDT. */
     fun push(branchName: String): ButResult<Unit> {
         assertBackgroundThread()
 
@@ -109,7 +109,7 @@ class GitButlerService(private val project: Project) {
     }
 
     /**
-     * Runs `but pull --format json`. Fetches the remote and rebases all applied branches onto
+     * Runs `but pull --json`. Fetches the remote and rebases all applied branches onto
      * the updated target — a network operation, so uses [PUSH_TIMEOUT_MS]. Ok on exit 0. Not on EDT.
      */
     fun pull(): ButResult<Unit> {
@@ -119,7 +119,7 @@ class GitButlerService(private val project: Project) {
         val exe = butExecutable() ?: return ButResult.Err(BINARY_MISSING_MESSAGE)
 
         val output = when (
-            val r = runBut(exe, repoRoot, listOf("pull", "--format", "json"), PUSH_TIMEOUT_MS)
+            val r = runBut(exe, repoRoot, ButCommands.pull(), PUSH_TIMEOUT_MS)
         ) {
             is ButResult.Ok -> r.value
             is ButResult.Err -> return r
@@ -132,7 +132,7 @@ class GitButlerService(private val project: Project) {
         return ButResult.Ok(Unit)
     }
 
-    /** Runs `but apply <branchName> --format json`. Ok on exit 0. Not on EDT. */
+    /** Runs `but apply <branchName> --json`. Ok on exit 0. Not on EDT. */
     fun apply(branchName: String): ButResult<Unit> {
         assertBackgroundThread()
 
@@ -153,7 +153,7 @@ class GitButlerService(private val project: Project) {
         return ButResult.Ok(Unit)
     }
 
-    /** Runs `but unapply <branchName> --format json`. Ok on exit 0. Not on EDT. */
+    /** Runs `but unapply <branchName> --json`. Ok on exit 0. Not on EDT. */
     fun unapply(branchName: String): ButResult<Unit> {
         assertBackgroundThread()
 
@@ -178,7 +178,7 @@ class GitButlerService(private val project: Project) {
      * Commits the given files to the named virtual branch:
      * 1. run status(); map each path to its cliId via uncommittedChanges
      * 2. Err listing the offending paths if any path has no cliId
-     * 3. run `but commit <branchName> -m <message> --changes <ids>` and parse. Not on EDT.
+     * 3. run `but commit -b <branchName> -m <message> <ids>` and parse. Not on EDT.
      */
     fun commit(branchName: String, message: String, filePaths: List<String>): ButResult<String> {
         assertBackgroundThread()
@@ -214,12 +214,12 @@ class GitButlerService(private val project: Project) {
         }
 
         // Exit code 0 means the commit succeeded; the JSON is only enrichment
-        // (commit id, rejected changes). Its shape varies between workspaces,
-        // so parse failures must not surface as commit failures.
+        // (the resulting commitId), so a parse failure must not surface as a
+        // commit failure.
         return try {
             val parsed = ButJsonParser.parseCommitResult(output.stdout)
             if (parsed is ButResult.Ok && parsed.value.isBlank()) {
-                LOG.warn("`but commit` exited 0 but output had no result/commit_id. Raw output: ${output.stdout}")
+                LOG.warn("`but commit` exited 0 but output had no commitId. Raw output: ${output.stdout}")
             }
             parsed
         } catch (e: Exception) {
@@ -232,7 +232,7 @@ class GitButlerService(private val project: Project) {
      * Amends the given files into an existing commit:
      * 1. run status(); map each path to its cliId via uncommittedChanges
      * 2. Err listing the offending paths if any path has no cliId
-     * 3. run `but amend <commitId> --changes <ids>`. Not on EDT.
+     * 3. run `but amend -t <commitId> <ids>`. Not on EDT.
      */
     fun amend(commitId: String, filePaths: List<String>): ButResult<Unit> {
         assertBackgroundThread()

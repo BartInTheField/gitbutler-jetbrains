@@ -16,7 +16,7 @@ import com.google.gson.JsonParser
 object ButJsonParser {
 
     /**
-     * Parses `but status --format json`. branches = all branches of all stacks, in order
+     * Parses `but status -f --json`. branches = all branches of all stacks, in order
      * (the same [VirtualBranch] instances that appear under [WorkspaceStatus.stacks]).
      * uncommittedChanges also includes every stack's assignedChanges entries; each stack's
      * assignedChanges are ADDITIONALLY exposed on [ButStack.assignedChanges] (the same
@@ -59,13 +59,12 @@ object ButJsonParser {
     }
 
     /**
-     * Parses `but commit --format json` output. Ok(commitId) on success.
-     * Err if the JSON has an "error" field or result.rejected is non-empty.
+     * Parses `but commit --json` output. Ok(commitId) on success.
      *
-     * The CLI signals failure via a JSON "error" field plus a non-zero exit code,
-     * so a shape without "result"/"commit_id" is NOT treated as failure — the
-     * output shape has been observed to vary between workspaces. Such cases
-     * return Ok("") (commit succeeded, id unknown); the caller logs the raw output.
+     * but 0.22 emits `{commitId, changeId, branch}` on success and signals failure via a
+     * non-zero exit code plus a plain-text stderr message (handled by the caller), so this
+     * only runs on exit 0. A shape without `commitId` returns Ok("") (commit succeeded,
+     * id unknown); the caller logs the raw output. A defensive `error` field still maps to Err.
      */
     fun parseCommitResult(json: String): ButResult<String> {
         val root = JsonParser.parseString(json).asJsonObject
@@ -74,16 +73,7 @@ object ButJsonParser {
             return ButResult.Err(parseErrorMessage(json))
         }
 
-        // but 0.21 emits commit_id/rejected either nested under "result" or at the top level.
-        val result = root.getAsJsonObject("result") ?: root
-
-        val rejected = result.getAsJsonArray("rejected")
-        if (rejected != null && rejected.size() > 0) {
-            val paths = rejected.joinToString(", ") { renderRejected(it) }
-            return ButResult.Err("Commit rejected changes: $paths")
-        }
-
-        return ButResult.Ok(stringOrEmpty(result, "commit_id"))
+        return ButResult.Ok(stringOrEmpty(root, "commitId"))
     }
 
     /** Extracts "message" (fallback "error", fallback raw) from an error JSON. Never throws. */
@@ -145,17 +135,6 @@ object ButJsonParser {
             conflicted = optBoolean(obj, "conflicted"),
             changes = changes,
         )
-    }
-
-    private fun renderRejected(element: JsonElement): String {
-        if (element.isJsonObject) {
-            val obj = element.asJsonObject
-            optString(obj, "filePath")?.let { return it }
-        }
-        if (element.isJsonPrimitive) {
-            return element.asString
-        }
-        return element.toString()
     }
 
     /** Reads a boolean; null / missing / non-boolean -> false. */
