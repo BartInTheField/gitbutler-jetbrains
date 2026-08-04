@@ -34,7 +34,8 @@ import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.tree.TreeUtil
 import com.intellij.ui.treeStructure.Tree
-import com.intellij.vcs.log.impl.VcsLogContentUtil
+import com.intellij.vcs.log.impl.HashImpl
+import com.intellij.vcs.log.impl.VcsLogNavigationUtil
 import me.inthefield.gitbutlerforjetbrains.core.ButResult
 import me.inthefield.gitbutlerforjetbrains.core.ButStack
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
@@ -448,14 +449,14 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
 
         override fun update(e: AnActionEvent) {
             e.presentation.setText("Show in Git Log", false)
-            e.presentation.isEnabledAndVisible = selectedCommit() != null
+            e.presentation.isEnabledAndVisible = selectedCommit()?.commitId?.isNotBlank() == true
         }
 
         override fun actionPerformed(e: AnActionEvent) {
             val commit = selectedCommit() ?: return
-            VcsLogContentUtil.runInMainLog(project) { logUi ->
-                logUi.vcsLog.jumpToReference(commit.commitId)
-            }
+            if (commit.commitId.isBlank()) return
+            val root = repoRoot() ?: return
+            VcsLogNavigationUtil.jumpToRevisionAsync(project, root, HashImpl.build(commit.commitId), null)
         }
     }
 
