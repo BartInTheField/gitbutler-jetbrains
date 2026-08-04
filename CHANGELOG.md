@@ -12,6 +12,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Internal improvements
 
+## 2026.8.4.1 - 2026-08-04
+
+### Features
+
+### Fixes
+
+### Internal improvements
+
 * Removed the use of internal and deprecated jetbrains API's
 
 ## 2026.7.31.1 - 2026-07-31
