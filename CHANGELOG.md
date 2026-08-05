@@ -10,6 +10,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Fixes
 
+### Internal improvements
+
+## 2026.8.5.1 - 2026-08-05
+
+### Features
+
+### Fixes
+
 - Detect the GitButler CLI on Windows, where `but` on PATH resolves to `but.exe`
   (or a `but.cmd`/`but.bat` shim) via PATHEXT; the extension now probes those
   suffixes on Windows so the CLI is found when it works from the terminal.
