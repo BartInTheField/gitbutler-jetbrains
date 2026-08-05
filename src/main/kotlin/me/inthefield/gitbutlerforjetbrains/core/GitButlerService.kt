@@ -35,26 +35,19 @@ class GitButlerService(private val project: Project) {
     }
 
     /**
-     * Absolute path to the `but` binary or null. Search order: PATH entries, then
-     * ~/.local/bin/but, /opt/homebrew/bin/but, /usr/local/bin/but. Cached after first success.
+     * Absolute path to the `but` binary or null. Search order: PATH entries (with PATHEXT
+     * suffixes on Windows), then ~/.local/bin/but, /opt/homebrew/bin/but, /usr/local/bin/but.
+     * Cached after first success.
      */
     fun butExecutable(): String? {
         cachedExecutable?.let { return it }
 
-        val candidates = mutableListOf<File>()
-        System.getenv("PATH")
-            ?.split(File.pathSeparatorChar)
-            ?.filter { it.isNotBlank() }
-            ?.forEach { candidates.add(File(it, BINARY_NAME)) }
-
-        val home = System.getProperty("user.home")
-        if (!home.isNullOrBlank()) {
-            candidates.add(File(home, ".local/bin/$BINARY_NAME"))
-        }
-        candidates.add(File("/opt/homebrew/bin/$BINARY_NAME"))
-        candidates.add(File("/usr/local/bin/$BINARY_NAME"))
-
-        val found = candidates.firstOrNull { it.isFile && it.canExecute() }?.absolutePath
+        val found = ButExecutableResolver.resolve(
+            osName = System.getProperty("os.name").orEmpty(),
+            path = System.getenv("PATH"),
+            pathExt = System.getenv("PATHEXT"),
+            home = System.getProperty("user.home"),
+        ) { File(it).let { f -> f.isFile && f.canExecute() } }
         if (found != null) {
             cachedExecutable = found
         }
@@ -331,11 +324,11 @@ class GitButlerService(private val project: Project) {
     companion object {
         private val LOG = Logger.getInstance(GitButlerService::class.java)
         private const val WORKSPACE_BRANCH = "gitbutler/workspace"
-        private const val BINARY_NAME = "but"
         private const val PROCESS_TIMEOUT_MS = 30_000
         private const val PUSH_TIMEOUT_MS = 120_000
         private const val BINARY_MISSING_MESSAGE =
-            "GitButler CLI (`but`) not found on PATH, in ~/.local/bin, /opt/homebrew/bin, or /usr/local/bin"
+            "GitButler CLI (`but`) not found on PATH (checked PATHEXT extensions on Windows) " +
+                "or in ~/.local/bin, /opt/homebrew/bin, /usr/local/bin"
 
         fun getInstance(project: Project): GitButlerService = project.service()
     }
