@@ -56,7 +56,7 @@ The plugin adds two GitButler surfaces to the IDE, both active only when your pr
 | | |
 |---|---|
 | **IDE** | IntelliJ IDEA 2025.1+ (Community or Ultimate) |
-| **CLI** | [GitButler `but`](https://docs.gitbutler.com/cli-overview) 0.22.0+ on your `PATH` (also auto-detected in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`) |
+| **CLI** | [GitButler `but`](https://docs.gitbutler.com/cli-overview) 0.22.0+ on your `PATH` (on Windows resolved via PATHEXT, e.g. `but.exe`/`but.cmd`; also auto-detected in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`) |
 | **Project** | Set up with GitButler (`but setup`) |
 
 ## 🛠 Installation
